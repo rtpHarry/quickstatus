@@ -1,12 +1,21 @@
 <ion-item lines="none" class="task-row">
-  <ion-segment [(ngModel)]="task.status" (ionChange)="emitChange()">
-    <ion-segment-button value="✅">✅</ion-segment-button>
-    <ion-segment-button value="☑️">☑️</ion-segment-button>
-    <ion-segment-button value="❌">❌</ion-segment-button>
-  </ion-segment>
-  <ion-input
-    [(ngModel)]="task.text"
-    (ionChange)="emitChange()"
-    placeholder="Enter task"
-  ></ion-input>
+  <ion-grid>
+    <ion-row class="ion-align-items-center">
+      <ion-col size="auto">
+        <ion-segment [(ngModel)]="task.status" (ionChange)="emitChange()">
+          <ion-segment-button value="✅">✅</ion-segment-button>
+          <ion-segment-button value="☑️">☑️</ion-segment-button>
+          <ion-segment-button value="❌">❌</ion-segment-button>
+        </ion-segment>
+      </ion-col>
+      <ion-col>
+        <ion-input
+          style="width: 100%"
+          [(ngModel)]="task.text"
+          (ionChange)="emitChange()"
+          placeholder="Enter task"
+        ></ion-input>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
 </ion-item>

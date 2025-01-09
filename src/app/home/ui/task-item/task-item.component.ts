@@ -2,8 +2,11 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
+  IonCol,
+  IonGrid,
   IonInput,
   IonItem,
+  IonRow,
   IonSegment,
   IonSegmentButton,
 } from '@ionic/angular/standalone';
@@ -14,8 +17,11 @@ import {
   styleUrls: ['./task-item.component.scss'],
   standalone: true,
   imports: [
+    IonCol,
     CommonModule,
     FormsModule,
+    IonGrid,
+    IonRow,
     IonItem,
     IonSegment,
     IonSegmentButton,
