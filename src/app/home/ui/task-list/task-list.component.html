@@ -1,11 +1,11 @@
 <ion-list>
   <ion-reorder-group (ionItemReorder)="reorderTasks($event)" disabled="false">
     <ion-item *ngFor="let task of tasks; let i = index">
+      <ion-reorder slot="start"></ion-reorder>
       <app-task-item
         [task]="task"
         (taskChange)="onTaskChange($event, i)"
       ></app-task-item>
-      <ion-reorder slot="end"></ion-reorder>
     </ion-item>
   </ion-reorder-group>
 </ion-list>
