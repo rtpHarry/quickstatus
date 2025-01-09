@@ -13,8 +13,8 @@
 
   <div id="container">
     <app-task-list
-      [tasks]="initialList"
-      (taskChange)="handleTaskChange($event)"
+      [tasksString]="initialCombinedList"
+      (listChange)="handleTaskListChange($event)"
     ></app-task-list>
   </div>
 </ion-content>

@@ -39,4 +39,8 @@ export class TaskItemComponent implements OnInit {
   emitChange() {
     this.taskChange.emit(this.task);
   }
+
+  onInputChange() {
+    this.emitChange();
+  }
 }

@@ -1,6 +1,7 @@
 import { NgForOf } from '@angular/common';
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import {
+  AlertController,
   IonButton,
   IonIcon,
   IonItem,
@@ -10,7 +11,7 @@ import {
   ToastController,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { addCircleOutline, copyOutline } from 'ionicons/icons';
+import { addCircleOutline, copyOutline, refreshOutline } from 'ionicons/icons';
 import { TaskItemComponent } from '../task-item/task-item.component';
 
 @Component({
@@ -30,12 +31,21 @@ import { TaskItemComponent } from '../task-item/task-item.component';
   ],
 })
 export class TaskListComponent implements OnInit {
-  @Input() tasks: { status: string; text: string }[] = [];
+  @Input() set tasksString(value: string) {
+    this.tasks = value.split('\n').map((item) => {
+      const [status, ...textParts] = item.split('  ');
+      return { status, text: textParts.join(' ') };
+    });
+  }
   @Output() listChange = new EventEmitter<string>();
-  @Output() taskChange = new EventEmitter<{ status: string; text: string }>();
 
-  constructor(private toastController: ToastController) {
-    addIcons({ addCircleOutline, copyOutline });
+  tasks: { status: string; text: string }[] = [];
+
+  constructor(
+    private toastController: ToastController,
+    private alertController: AlertController
+  ) {
+    addIcons({ addCircleOutline, copyOutline, refreshOutline });
   }
 
   ngOnInit() {}
@@ -87,6 +97,28 @@ export class TaskListComponent implements OnInit {
       console.error('Fallback: Oops, unable to copy', err);
     }
     document.body.removeChild(textArea);
+  }
+
+  async resetTasks() {
+    const alert = await this.alertController.create({
+      header: 'Reset List',
+      message: 'Are you sure you want to reset the list?',
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel',
+        },
+        {
+          text: 'Yes',
+          handler: () => {
+            this.tasks = [{ status: '☑️', text: '' }];
+            this.emitListChange();
+          },
+        },
+      ],
+    });
+
+    await alert.present();
   }
 
   private emitListChange() {

@@ -14,20 +14,19 @@ import { TaskListComponent } from './ui/task-list/task-list.component';
   imports: [IonHeader, IonToolbar, IonTitle, IonContent, TaskListComponent],
 })
 export class HomePage implements OnInit {
-  initialList: { status: string; text: string }[] = [];
+  initialCombinedList: string = '';
 
   constructor() {}
 
   ngOnInit() {
     const savedList = localStorage.getItem('taskList');
     if (savedList) {
-      this.initialList = JSON.parse(savedList);
+      this.initialCombinedList = savedList;
     }
   }
 
-  handleTaskChange(task: { status: string; text: string }) {
-    const updatedList = [...this.initialList, task];
-    localStorage.setItem('taskList', JSON.stringify(updatedList));
-    this.initialList = updatedList;
+  handleTaskListChange(combinedList: string) {
+    console.log('Task list changed:', combinedList);
+    localStorage.setItem('taskList', combinedList);
   }
 }

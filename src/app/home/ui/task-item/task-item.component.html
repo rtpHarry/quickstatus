@@ -12,7 +12,7 @@
         <ion-input
           style="width: 100%"
           [(ngModel)]="task.text"
-          (ionChange)="emitChange()"
+          (ionInput)="emitChange()"
           placeholder="Enter task"
         ></ion-input>
       </ion-col>
