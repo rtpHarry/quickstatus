@@ -1,0 +1,14 @@
+<ion-item>
+  <ion-segment [(ngModel)]="task.status" (ionChange)="emitChange()">
+    <ion-segment-button value="✅">✅</ion-segment-button>
+    <ion-segment-button value="☑️">☑️</ion-segment-button>
+    <ion-segment-button value="❌">❌</ion-segment-button>
+  </ion-segment>
+</ion-item>
+<ion-item>
+  <ion-input
+    [(ngModel)]="task.text"
+    (ionChange)="emitChange()"
+    placeholder="Enter task"
+  ></ion-input>
+</ion-item>
