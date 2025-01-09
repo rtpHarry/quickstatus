@@ -2,11 +2,14 @@ import { NgForOf } from '@angular/common';
 import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import {
   IonButton,
+  IonIcon,
   IonItem,
   IonList,
   IonReorder,
   IonReorderGroup,
 } from '@ionic/angular/standalone';
+import { addIcons } from 'ionicons';
+import { addCircleOutline } from 'ionicons/icons';
 import { TaskItemComponent } from '../task-item/task-item.component';
 
 @Component({
@@ -15,6 +18,7 @@ import { TaskItemComponent } from '../task-item/task-item.component';
   styleUrls: ['./task-list.component.scss'],
   standalone: true,
   imports: [
+    IonIcon,
     NgForOf,
     IonReorder,
     IonList,
@@ -28,7 +32,9 @@ export class TaskListComponent implements OnInit {
   @Output() listChange = new EventEmitter<string>();
   tasks = [{ status: '☑️', text: 'dns for sophie' }];
 
-  constructor() {}
+  constructor() {
+    addIcons({ addCircleOutline });
+  }
 
   ngOnInit() {}
 
