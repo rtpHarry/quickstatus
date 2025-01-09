@@ -1,5 +1,5 @@
 import { NgForOf } from '@angular/common';
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import {
   IonButton,
   IonIcon,
@@ -30,8 +30,9 @@ import { TaskItemComponent } from '../task-item/task-item.component';
   ],
 })
 export class TaskListComponent implements OnInit {
+  @Input() tasks: { status: string; text: string }[] = [];
   @Output() listChange = new EventEmitter<string>();
-  tasks = [{ status: '☑️', text: 'dns for sophie' }];
+  @Output() taskChange = new EventEmitter<{ status: string; text: string }>();
 
   constructor(private toastController: ToastController) {
     addIcons({ addCircleOutline, copyOutline });

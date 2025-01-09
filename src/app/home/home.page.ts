@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import {
   IonContent,
   IonHeader,
@@ -13,6 +13,21 @@ import { TaskListComponent } from './ui/task-list/task-list.component';
   styleUrls: ['home.page.scss'],
   imports: [IonHeader, IonToolbar, IonTitle, IonContent, TaskListComponent],
 })
-export class HomePage {
+export class HomePage implements OnInit {
+  initialList: { status: string; text: string }[] = [];
+
   constructor() {}
+
+  ngOnInit() {
+    const savedList = localStorage.getItem('taskList');
+    if (savedList) {
+      this.initialList = JSON.parse(savedList);
+    }
+  }
+
+  handleTaskChange(task: { status: string; text: string }) {
+    const updatedList = [...this.initialList, task];
+    localStorage.setItem('taskList', JSON.stringify(updatedList));
+    this.initialList = updatedList;
+  }
 }

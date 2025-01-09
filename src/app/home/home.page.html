@@ -12,6 +12,9 @@
   </ion-header>
 
   <div id="container">
-    <app-task-list></app-task-list>
+    <app-task-list
+      [tasks]="initialList"
+      (taskChange)="handleTaskChange($event)"
+    ></app-task-list>
   </div>
 </ion-content>
