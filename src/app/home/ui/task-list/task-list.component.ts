@@ -93,7 +93,7 @@ export class TaskListComponent implements OnInit {
   ngOnInit() {}
 
   addTask() {
-    this.tasks.push({ status: '☑️', text: '' });
+    this.tasks.push({ status: '❌', text: '' });
     this.emitListChange();
   }
 
@@ -158,7 +158,7 @@ export class TaskListComponent implements OnInit {
         {
           text: 'Yes',
           handler: () => {
-            this.tasks = [{ status: '☑️', text: '' }];
+            this.tasks = [{ status: '❌', text: '' }];
             this.emitListChange();
           },
         },
