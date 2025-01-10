@@ -9,7 +9,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "deploy": "npx angular-cli-ghpages --dir=www/browser"
   },
   "private": true,
   "dependencies": {
