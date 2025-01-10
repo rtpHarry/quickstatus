@@ -6,6 +6,7 @@
         <app-task-item
           [task]="task"
           (taskChange)="onTaskChange($event, i)"
+          (enterKey)="handleEnterKey(i)"
           style="width: 100%"
         ></app-task-item>
       </ion-item>

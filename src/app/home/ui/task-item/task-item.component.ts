@@ -31,6 +31,7 @@ import {
 export class TaskItemComponent implements OnInit {
   @Input() task!: { status: string; text: string };
   @Output() taskChange = new EventEmitter<{ status: string; text: string }>();
+  @Output() enterKey = new EventEmitter<void>();
 
   constructor() {}
 
@@ -42,5 +43,9 @@ export class TaskItemComponent implements OnInit {
 
   onInputChange() {
     this.emitChange();
+  }
+
+  emitEnterKey() {
+    this.enterKey.emit();
   }
 }

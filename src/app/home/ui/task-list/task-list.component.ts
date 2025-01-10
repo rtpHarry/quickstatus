@@ -92,9 +92,18 @@ export class TaskListComponent implements OnInit {
 
   ngOnInit() {}
 
-  addTask() {
-    this.tasks.push({ status: '❌', text: '' });
+  addTask(index?: number) {
+    const newTask = { status: '❌', text: '' };
+    if (index !== undefined) {
+      this.tasks.splice(index + 1, 0, newTask);
+    } else {
+      this.tasks.push(newTask);
+    }
     this.emitListChange();
+  }
+
+  handleEnterKey(index: number) {
+    this.addTask(index);
   }
 
   reorderTasks(event: any) {

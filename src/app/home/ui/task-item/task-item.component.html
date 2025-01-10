@@ -13,6 +13,7 @@
           style="width: 100%"
           [(ngModel)]="task.text"
           (ionInput)="emitChange()"
+          (keydown.enter)="emitEnterKey()"
           placeholder="Enter task"
           name="task"
           autocomplete="off"
