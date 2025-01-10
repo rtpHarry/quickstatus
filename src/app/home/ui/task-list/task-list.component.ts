@@ -96,8 +96,21 @@ export class TaskListComponent implements OnInit {
     const newTask = { status: '❌', text: '' };
     if (index !== undefined) {
       this.tasks.splice(index + 1, 0, newTask);
+      setTimeout(() => {
+        const input = document.querySelectorAll('ion-input')[index + 1];
+        if (input) {
+          input.setFocus();
+        }
+      });
     } else {
       this.tasks.push(newTask);
+      setTimeout(() => {
+        const input =
+          document.querySelectorAll('ion-input')[this.tasks.length - 1];
+        if (input) {
+          input.setFocus();
+        }
+      });
     }
     this.emitListChange();
   }
