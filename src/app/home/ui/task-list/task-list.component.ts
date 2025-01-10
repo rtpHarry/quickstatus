@@ -1,17 +1,38 @@
 import { NgForOf } from '@angular/common';
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnInit,
+  Output,
+  ViewChild,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import {
   AlertController,
   IonButton,
+  IonButtons,
+  IonContent,
+  IonHeader,
   IonIcon,
   IonItem,
   IonList,
+  IonModal,
   IonReorder,
   IonReorderGroup,
+  IonTextarea,
+  IonTitle,
+  IonToolbar,
   ToastController,
 } from '@ionic/angular/standalone';
+import { OverlayEventDetail } from '@ionic/core/components';
 import { addIcons } from 'ionicons';
-import { addCircleOutline, copyOutline, refreshOutline } from 'ionicons/icons';
+import {
+  addCircleOutline,
+  clipboardOutline,
+  copyOutline,
+  refreshOutline,
+} from 'ionicons/icons';
 import { TaskItemComponent } from '../task-item/task-item.component';
 
 @Component({
@@ -20,6 +41,12 @@ import { TaskItemComponent } from '../task-item/task-item.component';
   styleUrls: ['./task-list.component.scss'],
   standalone: true,
   imports: [
+    IonTitle,
+    IonHeader,
+    IonModal,
+    IonToolbar,
+    IonContent,
+    IonTextarea,
     IonIcon,
     NgForOf,
     IonReorder,
@@ -27,25 +54,32 @@ import { TaskItemComponent } from '../task-item/task-item.component';
     IonReorderGroup,
     IonItem,
     IonButton,
+    IonButtons,
     TaskItemComponent,
+    FormsModule,
   ],
 })
 export class TaskListComponent implements OnInit {
   @Input() set tasksString(value: string) {
-    this.tasks = value.split('\n').map((item) => {
-      const [status, ...textParts] = item.split('  ');
-      return { status, text: textParts.join(' ') };
-    });
+    this.tasks = this.parseTasks(value);
   }
   @Output() listChange = new EventEmitter<string>();
 
   tasks: { status: string; text: string }[] = [];
+  pastedContent = '';
+
+  @ViewChild(IonModal) modal!: IonModal;
 
   constructor(
     private toastController: ToastController,
     private alertController: AlertController
   ) {
-    addIcons({ addCircleOutline, copyOutline, refreshOutline });
+    addIcons({
+      addCircleOutline,
+      copyOutline,
+      clipboardOutline,
+      refreshOutline,
+    });
   }
 
   ngOnInit() {}
@@ -121,8 +155,34 @@ export class TaskListComponent implements OnInit {
     await alert.present();
   }
 
+  cancelPaste() {
+    this.modal.dismiss(null, 'cancel');
+  }
+
+  confirmPaste() {
+    try {
+      this.tasks = this.parseTasks(this.pastedContent);
+    } catch (e) {
+      console.error('Failed to parse tasks:', e);
+    }
+    this.modal.dismiss();
+  }
+
+  onWillDismiss(event: CustomEvent<OverlayEventDetail>) {
+    if (event.detail.role === 'confirm') {
+      this.emitListChange();
+    }
+  }
+
+  private parseTasks(value: string): { status: string; text: string }[] {
+    return value.split('\n').map((item) => {
+      const [status, ...textParts] = item.split(/\s+/);
+      return { status, text: textParts.join(' ') };
+    });
+  }
+
   private emitListChange() {
-    const combined = this.tasks.map((t) => `${t.status}  ${t.text}`).join('\n');
+    const combined = this.tasks.map((t) => `${t.status} ${t.text}`).join('\n');
     this.listChange.emit(combined);
   }
 

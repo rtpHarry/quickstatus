@@ -19,7 +19,36 @@
   Copy List
   <ion-icon slot="end" name="copy-outline"></ion-icon>
 </ion-button>
+<ion-button id="open-paste-modal">
+  Paste List
+  <ion-icon slot="end" name="clipboard-outline"></ion-icon>
+</ion-button>
 <ion-button (click)="resetTasks()" color="danger">
   Reset List
   <ion-icon slot="end" name="refresh-outline"></ion-icon>
 </ion-button>
+
+<!-- Paste List Dialog -->
+<ion-modal trigger="open-paste-modal" (willDismiss)="onWillDismiss($event)">
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-button (click)="cancelPaste()">Cancel</ion-button>
+        </ion-buttons>
+        <ion-title>Paste List</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="confirmPaste()" [strong]="true">
+            Confirm
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <ion-textarea
+        [(ngModel)]="pastedContent"
+        placeholder="Paste your list here"
+      ></ion-textarea>
+    </ion-content>
+  </ng-template>
+</ion-modal>
