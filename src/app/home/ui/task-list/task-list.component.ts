@@ -16,6 +16,9 @@ import {
   IonHeader,
   IonIcon,
   IonItem,
+  IonItemOption,
+  IonItemOptions,
+  IonItemSliding,
   IonList,
   IonModal,
   IonReorder,
@@ -32,6 +35,7 @@ import {
   clipboardOutline,
   copyOutline,
   refreshOutline,
+  trashOutline,
 } from 'ionicons/icons';
 import { TaskItemComponent } from '../task-item/task-item.component';
 
@@ -55,6 +59,9 @@ import { TaskItemComponent } from '../task-item/task-item.component';
     IonItem,
     IonButton,
     IonButtons,
+    IonItemSliding,
+    IonItemOption,
+    IonItemOptions,
     TaskItemComponent,
     FormsModule,
   ],
@@ -79,6 +86,7 @@ export class TaskListComponent implements OnInit {
       copyOutline,
       clipboardOutline,
       refreshOutline,
+      trashOutline,
     });
   }
 
@@ -98,6 +106,11 @@ export class TaskListComponent implements OnInit {
 
   onTaskChange(updatedTask: any, index: number) {
     this.tasks[index] = updatedTask;
+    this.emitListChange();
+  }
+
+  deleteTask(index: number) {
+    this.tasks.splice(index, 1);
     this.emitListChange();
   }
 
