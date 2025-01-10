@@ -32,6 +32,7 @@ export class TaskItemComponent implements OnInit {
   @Input() task!: { status: string; text: string };
   @Output() taskChange = new EventEmitter<{ status: string; text: string }>();
   @Output() enterKey = new EventEmitter<void>();
+  @Output() deleteKey = new EventEmitter<void>();
 
   constructor() {}
 
@@ -47,5 +48,19 @@ export class TaskItemComponent implements OnInit {
 
   emitEnterKey() {
     this.enterKey.emit();
+  }
+
+  emitDeleteKey() {
+    this.deleteKey.emit();
+  }
+
+  handleKeydown(event: KeyboardEvent) {
+    const isDeleteKey = event.key === 'Backspace' || event.key === 'Delete';
+    const isTabPressed =
+      event.getModifierState && event.getModifierState('Shift');
+
+    if (isDeleteKey && (this.task.text === '' || isTabPressed)) {
+      this.emitDeleteKey();
+    }
   }
 }

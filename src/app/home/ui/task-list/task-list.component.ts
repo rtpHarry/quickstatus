@@ -106,6 +106,10 @@ export class TaskListComponent implements OnInit {
     this.addTask(index);
   }
 
+  handleDeleteKey(index: number) {
+    this.deleteTask(index);
+  }
+
   reorderTasks(event: any) {
     const itemMove = this.tasks.splice(event.detail.from, 1)[0];
     this.tasks.splice(event.detail.to, 0, itemMove);

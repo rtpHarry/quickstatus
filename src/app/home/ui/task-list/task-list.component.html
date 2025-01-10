@@ -7,6 +7,7 @@
           [task]="task"
           (taskChange)="onTaskChange($event, i)"
           (enterKey)="handleEnterKey(i)"
+          (deleteKey)="handleDeleteKey(i)"
           style="width: 100%"
         ></app-task-item>
       </ion-item>

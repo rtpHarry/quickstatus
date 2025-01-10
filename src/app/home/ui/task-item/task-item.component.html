@@ -14,6 +14,7 @@
           [(ngModel)]="task.text"
           (ionInput)="emitChange()"
           (keydown.enter)="emitEnterKey()"
+          (keydown)="handleKeydown($event)"
           placeholder="Enter task"
           name="task"
           autocomplete="off"
