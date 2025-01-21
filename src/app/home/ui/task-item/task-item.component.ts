@@ -56,10 +56,10 @@ export class TaskItemComponent implements OnInit {
 
   handleKeydown(event: KeyboardEvent) {
     const isDeleteKey = event.key === 'Backspace' || event.key === 'Delete';
-    const isTabPressed =
-      event.getModifierState && event.getModifierState('Shift');
+    const isCtrlPressed = event.ctrlKey;
 
-    if (isDeleteKey && (this.task.text === '' || isTabPressed)) {
+    if (isDeleteKey && isCtrlPressed) {
+      event.preventDefault();
       this.emitDeleteKey();
     }
   }
