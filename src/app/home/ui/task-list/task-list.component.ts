@@ -195,6 +195,7 @@ export class TaskListComponent implements OnInit {
   }
 
   cancelPaste() {
+    this.pastedContent = '';
     this.modal.dismiss(null, 'cancel');
   }
 
@@ -204,6 +205,7 @@ export class TaskListComponent implements OnInit {
     } catch (e) {
       console.error('Failed to parse tasks:', e);
     }
+    this.pastedContent = '';
     this.modal.dismiss();
   }
 
