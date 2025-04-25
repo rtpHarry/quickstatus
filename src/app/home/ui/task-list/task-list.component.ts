@@ -175,6 +175,11 @@ export class TaskListComponent implements OnInit {
     // Delete the task
     this.tasks.splice(index, 1);
 
+    // If list is empty after deletion, add a new empty task
+    if (this.tasks.length === 0) {
+      this.tasks.push({ status: '❌', text: '' });
+    }
+
     // Update the list
     this.emitListChange();
 
