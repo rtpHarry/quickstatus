@@ -1,22 +1,24 @@
 <ion-list>
   <ion-reorder-group (ionItemReorder)="reorderTasks($event)" disabled="false">
-    <ion-item-sliding *ngFor="let task of tasks; let i = index">
-      <ion-item style="width: 100%">
-        <ion-reorder slot="start"></ion-reorder>
-        <app-task-item
-          [task]="task"
-          (taskChange)="onTaskChange($event, i)"
-          (enterKey)="handleEnterKey(i)"
-          (deleteKey)="handleDeleteKey(i)"
-          style="width: 100%"
-        ></app-task-item>
-      </ion-item>
-      <ion-item-options side="end">
-        <ion-item-option color="danger" (click)="deleteTask(i)">
-          <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
-        </ion-item-option>
-      </ion-item-options>
-    </ion-item-sliding>
+    <ion-item *ngFor="let task of tasks; let i = index" style="width: 100%">
+      <ion-reorder slot="start"></ion-reorder>
+      <app-task-item
+        [task]="task"
+        (taskChange)="onTaskChange($event, i)"
+        (enterKey)="handleEnterKey(i)"
+        (deleteKey)="handleDeleteKey(i)"
+        style="flex-grow: 1"
+      ></app-task-item>
+      <ion-button
+        fill="clear"
+        color="danger"
+        slot="end"
+        (click)="deleteTask(i)"
+        style="margin: 0; padding: 0"
+      >
+        <ion-icon name="trash-outline"></ion-icon>
+      </ion-button>
+    </ion-item>
   </ion-reorder-group>
 </ion-list>
 
