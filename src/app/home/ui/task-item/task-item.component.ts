@@ -59,10 +59,18 @@ export class TaskItemComponent implements OnInit {
   handleKeydown(event: KeyboardEvent) {
     const isDeleteKey = event.key === 'Backspace' || event.key === 'Delete';
     const isCtrlPressed = event.ctrlKey;
+    const isEmpty = !this.task.text || this.task.text.trim() === '';
 
-    if (isDeleteKey && isCtrlPressed) {
-      event.preventDefault();
-      this.emitDeleteKey();
+    if (isDeleteKey) {
+      if (isCtrlPressed) {
+        // Existing functionality: delete with Ctrl+Backspace/Delete
+        event.preventDefault();
+        this.emitDeleteKey();
+      } else if (isEmpty) {
+        // New functionality: delete empty item with Backspace/Delete
+        event.preventDefault();
+        this.emitDeleteKey();
+      }
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       this.upArrow.emit();
