@@ -24,23 +24,6 @@
   </ion-reorder-group>
 </ion-list>
 
-<ion-button (click)="addTask()">
-  Add Task
-  <ion-icon slot="end" name="add-circle-outline"></ion-icon>
-</ion-button>
-<ion-button (click)="copyTasksToClipboard()">
-  Copy List
-  <ion-icon slot="end" name="copy-outline"></ion-icon>
-</ion-button>
-<ion-button id="open-paste-modal">
-  Paste List
-  <ion-icon slot="end" name="clipboard-outline"></ion-icon>
-</ion-button>
-<ion-button (click)="resetTasks()" color="danger">
-  Reset List
-  <ion-icon slot="end" name="refresh-outline"></ion-icon>
-</ion-button>
-
 <!-- Paste List Dialog -->
 <ion-modal
   trigger="open-paste-modal"

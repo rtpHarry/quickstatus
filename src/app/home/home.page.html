@@ -14,8 +14,32 @@
 
   <div id="container">
     <app-task-list
+      #taskList
       [tasksString]="initialCombinedList"
       (listChange)="handleTaskListChange($event)"
     ></app-task-list>
   </div>
 </ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <ion-buttons slot="end">
+      <ion-button (click)="taskList.addTask()">
+        <ion-icon slot="start" name="add-circle-outline"></ion-icon>
+        Add Task
+      </ion-button>
+      <ion-button (click)="taskList.copyTasksToClipboard()">
+        <ion-icon slot="start" name="copy-outline"></ion-icon>
+        Copy List
+      </ion-button>
+      <ion-button id="open-paste-modal">
+        <ion-icon slot="start" name="clipboard-outline"></ion-icon>
+        Paste List
+      </ion-button>
+      <ion-button (click)="taskList.resetTasks()" color="danger">
+        <ion-icon slot="start" name="refresh-outline"></ion-icon>
+        Reset List
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-footer>
