@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import {
   IonButton,
   IonButtons,
@@ -37,6 +37,8 @@ import { helpCircleOutline } from 'ionicons/icons';
   ],
 })
 export class KeyboardShortcutsComponent implements OnInit {
+  @ViewChild(IonModal) modal!: IonModal;
+
   constructor() {
     addIcons({
       helpCircleOutline,
@@ -46,9 +48,6 @@ export class KeyboardShortcutsComponent implements OnInit {
   ngOnInit() {}
 
   dismissModal() {
-    const modal = document.querySelector('ion-modal');
-    if (modal) {
-      modal.dismiss();
-    }
+    this.modal.dismiss();
   }
 }
