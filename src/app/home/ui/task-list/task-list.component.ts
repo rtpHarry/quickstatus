@@ -70,6 +70,7 @@ export class TaskListComponent implements OnInit {
   pastedContent = '';
 
   @ViewChild(IonModal) modal!: IonModal;
+  @ViewChild('pasteTextarea') pasteTextarea!: IonTextarea;
 
   constructor(
     private toastController: ToastController,
@@ -231,6 +232,14 @@ export class TaskListComponent implements OnInit {
     if (event.detail.role === 'confirm') {
       this.emitListChange();
     }
+  }
+
+  onModalPresent() {
+    setTimeout(() => {
+      if (this.pasteTextarea) {
+        this.pasteTextarea.setFocus();
+      }
+    }, 150);
   }
 
   private parseTasks(value: string): { status: string; text: string }[] {

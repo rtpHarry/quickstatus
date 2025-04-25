@@ -42,7 +42,11 @@
 </ion-button>
 
 <!-- Paste List Dialog -->
-<ion-modal trigger="open-paste-modal" (willDismiss)="onWillDismiss($event)">
+<ion-modal
+  trigger="open-paste-modal"
+  (willDismiss)="onWillDismiss($event)"
+  (ionModalDidPresent)="onModalPresent()"
+>
   <ng-template>
     <ion-header>
       <ion-toolbar>
@@ -60,6 +64,7 @@
     <ion-content class="ion-padding">
       <div class="full-height-wrapper">
         <ion-textarea
+          #pasteTextarea
           [(ngModel)]="pastedContent"
           placeholder="Paste your list here"
         ></ion-textarea>
