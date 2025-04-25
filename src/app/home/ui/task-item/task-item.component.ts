@@ -33,6 +33,8 @@ export class TaskItemComponent implements OnInit {
   @Output() taskChange = new EventEmitter<{ status: string; text: string }>();
   @Output() enterKey = new EventEmitter<void>();
   @Output() deleteKey = new EventEmitter<void>();
+  @Output() upArrow = new EventEmitter<void>();
+  @Output() downArrow = new EventEmitter<void>();
 
   constructor() {}
 
@@ -61,6 +63,12 @@ export class TaskItemComponent implements OnInit {
     if (isDeleteKey && isCtrlPressed) {
       event.preventDefault();
       this.emitDeleteKey();
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.upArrow.emit();
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.downArrow.emit();
     }
   }
 }

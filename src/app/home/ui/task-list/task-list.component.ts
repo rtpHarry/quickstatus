@@ -117,6 +117,30 @@ export class TaskListComponent implements OnInit {
     this.deleteTask(index);
   }
 
+  handleUpArrow(index: number) {
+    if (index > 0) {
+      setTimeout(() => {
+        const inputs = document.querySelectorAll('ion-input');
+        const prevInput = inputs[index - 1] as HTMLIonInputElement;
+        if (prevInput) {
+          prevInput.setFocus();
+        }
+      });
+    }
+  }
+
+  handleDownArrow(index: number) {
+    if (index < this.tasks.length - 1) {
+      setTimeout(() => {
+        const inputs = document.querySelectorAll('ion-input');
+        const nextInput = inputs[index + 1] as HTMLIonInputElement;
+        if (nextInput) {
+          nextInput.setFocus();
+        }
+      });
+    }
+  }
+
   reorderTasks(event: any) {
     const itemMove = this.tasks.splice(event.detail.from, 1)[0];
     this.tasks.splice(event.detail.to, 0, itemMove);

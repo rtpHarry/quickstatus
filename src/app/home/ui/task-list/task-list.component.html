@@ -7,6 +7,8 @@
         (taskChange)="onTaskChange($event, i)"
         (enterKey)="handleEnterKey(i)"
         (deleteKey)="handleDeleteKey(i)"
+        (upArrow)="handleUpArrow(i)"
+        (downArrow)="handleDownArrow(i)"
         style="flex-grow: 1"
       ></app-task-item>
       <ion-button
