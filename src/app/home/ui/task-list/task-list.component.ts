@@ -155,8 +155,39 @@ export class TaskListComponent implements OnInit {
   }
 
   deleteTask(index: number) {
+    // Store the length before deletion to check conditions
+    const originalLength = this.tasks.length;
+
+    // Determine which item to focus after deletion
+    let nextFocusIndex: number;
+
+    if (index > 0) {
+      // If not the first item, focus on previous item
+      nextFocusIndex = index - 1;
+    } else if (originalLength > 1) {
+      // If first item but not the only item, focus on the new first item (still at index 0)
+      nextFocusIndex = 0;
+    } else {
+      // If it's the only item, we'll add a new empty one and focus on it
+      nextFocusIndex = 0;
+    }
+
+    // Delete the task
     this.tasks.splice(index, 1);
+
+    // Update the list
     this.emitListChange();
+
+    // Set focus after the DOM updates
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('ion-input');
+      if (inputs.length > nextFocusIndex) {
+        const inputToFocus = inputs[nextFocusIndex] as HTMLIonInputElement;
+        if (inputToFocus) {
+          inputToFocus.setFocus();
+        }
+      }
+    });
   }
 
   async copyTasksToClipboard() {
