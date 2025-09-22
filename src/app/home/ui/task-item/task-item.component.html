@@ -22,6 +22,21 @@
           role="note"
         ></ion-input>
       </ion-col>
+      <ion-col size="auto">
+        <ion-button
+          fill="solid"
+          (click)="togglePrivate()"
+          [class]="
+            task.private ?? false
+              ? 'private-button-active'
+              : 'private-button-inactive'
+          "
+          title="Toggle private (excludes from copy)"
+          size="small"
+        >
+          🔒
+        </ion-button>
+      </ion-col>
     </ion-row>
   </ion-grid>
 </ion-item>

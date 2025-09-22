@@ -66,7 +66,7 @@ export class TaskListComponent implements OnInit {
   }
   @Output() listChange = new EventEmitter<string>();
 
-  tasks: { status: string; text: string }[] = [];
+  tasks: { status: string; text: string; private?: boolean }[] = [];
   pastedContent = '';
 
   @ViewChild(IonModal) modal!: IonModal;
@@ -88,7 +88,7 @@ export class TaskListComponent implements OnInit {
   ngOnInit() {}
 
   addTask(index?: number) {
-    const newTask = { status: '❌', text: '' };
+    const newTask = { status: '❌', text: '', private: false };
     if (index !== undefined) {
       this.tasks.splice(index + 1, 0, newTask);
       setTimeout(() => {
@@ -177,7 +177,7 @@ export class TaskListComponent implements OnInit {
 
     // If list is empty after deletion, add a new empty task
     if (this.tasks.length === 0) {
-      this.tasks.push({ status: '❌', text: '' });
+      this.tasks.push({ status: '❌', text: '', private: false });
     }
 
     // Update the list
@@ -196,12 +196,16 @@ export class TaskListComponent implements OnInit {
   }
 
   async copyTasksToClipboard() {
-    const combined = this.tasks.map((t) => `${t.status}  ${t.text}`).join('\n');
+    // Filter out private tasks when copying (handle graceful upgrade)
+    const publicTasks = this.tasks.filter((t) => !(t.private ?? false));
+    const combined = publicTasks
+      .map((t) => `${t.status}  ${t.text}`)
+      .join('\n');
     if (navigator.clipboard) {
       navigator.clipboard
         .writeText(combined)
         .then(() => {
-          this.showToast('List copied to clipboard');
+          this.showToast('List copied to clipboard (private items excluded)');
         })
         .catch((err) => {
           console.error('Failed to copy: ', err);
@@ -239,7 +243,7 @@ export class TaskListComponent implements OnInit {
         {
           text: 'Yes',
           handler: () => {
-            this.tasks = [{ status: '❌', text: '' }];
+            this.tasks = [{ status: '❌', text: '', private: false }];
             this.emitListChange();
           },
         },
@@ -278,22 +282,38 @@ export class TaskListComponent implements OnInit {
     }, 150);
   }
 
-  private parseTasks(value: string): { status: string; text: string }[] {
+  private parseTasks(
+    value: string
+  ): { status: string; text: string; private?: boolean }[] {
     // Handle empty or whitespace-only input by returning a default task
     if (!value || value.trim() === '') {
-      return [{ status: '❌', text: '' }];
+      return [{ status: '❌', text: '', private: false }];
     }
 
     return value.split('\n').map((item) => {
-      const [status, ...textParts] = item.split(/\s+/);
+      // Check if the line contains private flag (🔒)
+      const isPrivate = item.includes('🔒');
+      // Remove the private flag from the item for parsing
+      const cleanItem = item.replace('🔒', '').trim();
+
+      const [status, ...textParts] = cleanItem.split(/\s+/);
       // Ensure status has a default value if undefined or empty
       const taskStatus = status && status.trim() !== '' ? status : '❌';
-      return { status: taskStatus, text: textParts.join(' ') };
+      return {
+        status: taskStatus,
+        text: textParts.join(' '),
+        private: isPrivate,
+      };
     });
   }
 
   private emitListChange() {
-    const combined = this.tasks.map((t) => `${t.status} ${t.text}`).join('\n');
+    const combined = this.tasks
+      .map((t) => {
+        const privateFlag = t.private ?? false ? '🔒' : '';
+        return `${t.status} ${t.text} ${privateFlag}`.trim();
+      })
+      .join('\n');
     this.listChange.emit(combined);
   }
 

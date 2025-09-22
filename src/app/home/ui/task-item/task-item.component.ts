@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
+  IonButton,
   IonCol,
   IonGrid,
   IonInput,
@@ -17,6 +18,7 @@ import {
   styleUrls: ['./task-item.component.scss'],
   standalone: true,
   imports: [
+    IonButton,
     IonCol,
     CommonModule,
     FormsModule,
@@ -29,8 +31,12 @@ import {
   ],
 })
 export class TaskItemComponent implements OnInit {
-  @Input() task!: { status: string; text: string };
-  @Output() taskChange = new EventEmitter<{ status: string; text: string }>();
+  @Input() task!: { status: string; text: string; private?: boolean };
+  @Output() taskChange = new EventEmitter<{
+    status: string;
+    text: string;
+    private?: boolean;
+  }>();
   @Output() enterKey = new EventEmitter<void>();
   @Output() deleteKey = new EventEmitter<void>();
   @Output() upArrow = new EventEmitter<void>();
@@ -45,6 +51,12 @@ export class TaskItemComponent implements OnInit {
   }
 
   onInputChange() {
+    this.emitChange();
+  }
+
+  togglePrivate() {
+    // Handle graceful upgrade for existing data without private field
+    this.task.private = !(this.task.private ?? false);
     this.emitChange();
   }
 

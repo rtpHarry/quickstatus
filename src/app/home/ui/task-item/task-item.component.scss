@@ -1,1 +1,20 @@
+.private-button-active {
+  --background: var(--ion-color-primary);
+  --background-activated: var(--ion-color-primary-shade);
+  --background-hover: var(--ion-color-primary-tint);
+  --color: var(--ion-color-primary-contrast);
+  --border-radius: 6px;
+  min-height: 32px;
+  font-size: 16px;
+}
 
+.private-button-inactive {
+  --background: var(--ion-color-light);
+  --background-activated: var(--ion-color-light-shade);
+  --background-hover: var(--ion-color-light-tint);
+  --color: var(--ion-color-medium);
+  --border-radius: 6px;
+  min-height: 32px;
+  font-size: 16px;
+  opacity: 0.6;
+}
