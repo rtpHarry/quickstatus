@@ -279,9 +279,16 @@ export class TaskListComponent implements OnInit {
   }
 
   private parseTasks(value: string): { status: string; text: string }[] {
+    // Handle empty or whitespace-only input by returning a default task
+    if (!value || value.trim() === '') {
+      return [{ status: '❌', text: '' }];
+    }
+
     return value.split('\n').map((item) => {
       const [status, ...textParts] = item.split(/\s+/);
-      return { status, text: textParts.join(' ') };
+      // Ensure status has a default value if undefined or empty
+      const taskStatus = status && status.trim() !== '' ? status : '❌';
+      return { status: taskStatus, text: textParts.join(' ') };
     });
   }
 
