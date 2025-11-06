@@ -1,5 +1,5 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
 import { NgFor } from '@angular/common';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import {
   IonButton,
   IonButtons,
@@ -23,6 +23,11 @@ import {
 } from 'ionicons/icons';
 import { KeyboardShortcutsComponent } from './ui/keyboard-shortcuts/keyboard-shortcuts.component';
 import { TaskListComponent } from './ui/task-list/task-list.component';
+
+interface Project {
+  id: string;
+  name: string;
+}
 
 @Component({
   selector: 'app-home',
@@ -49,8 +54,8 @@ import { TaskListComponent } from './ui/task-list/task-list.component';
 export class HomePage implements OnInit {
   @ViewChild(TaskListComponent) taskListComponent?: TaskListComponent;
 
-  projects: string[] = ['Primary'];
-  selectedProject = 'Primary';
+  projects: Project[] = [];
+  selectedProjectId = '';
   currentTasksString = '';
 
   readonly addProjectSegmentValue = '__add_project__';
@@ -76,7 +81,7 @@ export class HomePage implements OnInit {
   handleTaskListChange(combinedList: string) {
     this.currentTasksString = combinedList;
     localStorage.setItem(
-      this.buildProjectKey(this.selectedProject),
+      this.buildProjectKey(this.selectedProjectId),
       combinedList
     );
   }
@@ -92,23 +97,50 @@ export class HomePage implements OnInit {
       return;
     }
 
-    if (value !== this.selectedProject) {
+    if (value !== this.selectedProjectId) {
       this.switchProject(value);
     }
   }
 
+  private generateUuid(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
   private initializeProjects() {
     const storedProjectsRaw = localStorage.getItem(this.projectsStorageKey);
-    let storedProjects: string[] | null = null;
+    let storedProjects: Project[] | null = null;
+    let needsPersist = false;
 
     if (storedProjectsRaw) {
       try {
         const parsed = JSON.parse(storedProjectsRaw);
         if (Array.isArray(parsed)) {
-          storedProjects = parsed.filter(
-            (item: unknown): item is string =>
-              typeof item === 'string' && item.trim().length > 0
-          );
+          // Check if it's the new format (array of objects with id and name)
+          if (
+            parsed.length > 0 &&
+            typeof parsed[0] === 'object' &&
+            'id' in parsed[0]
+          ) {
+            storedProjects = parsed.filter(
+              (item: unknown): item is Project =>
+                typeof item === 'object' &&
+                item !== null &&
+                'id' in item &&
+                'name' in item &&
+                typeof (item as Project).id === 'string' &&
+                typeof (item as Project).name === 'string' &&
+                (item as Project).id.trim().length > 0 &&
+                (item as Project).name.trim().length > 0
+            );
+          } else {
+            // Legacy format: array of strings - migrate to new format
+            storedProjects = this.migrateLegacyProjects(parsed);
+            needsPersist = true; // Mark that we need to persist the migrated data
+          }
         }
       } catch (error) {
         console.error('Failed to parse stored projects:', error);
@@ -116,46 +148,100 @@ export class HomePage implements OnInit {
     }
 
     if (!storedProjects || storedProjects.length === 0) {
+      // Check for legacy string-based projects in localStorage
       const legacyList = localStorage.getItem(this.legacyStorageKey);
-      const primaryKey = this.buildProjectKey('Primary');
-      const existingPrimary = localStorage.getItem(primaryKey);
+      const primaryId = this.generateUuid();
+      const primaryKey = this.buildProjectKey(primaryId);
+
+      // Check if there's existing data under old 'Primary' key
+      const oldPrimaryKey = this.buildProjectKey('Primary');
+      const existingPrimary = localStorage.getItem(oldPrimaryKey);
       const initialList = legacyList ?? existingPrimary ?? '';
-      this.projects = ['Primary'];
+
+      this.projects = [{ id: primaryId, name: 'Primary' }];
       this.persistProjects();
       localStorage.setItem(primaryKey, initialList);
+
+      // Clean up old keys
       if (legacyList !== null) {
         localStorage.removeItem(this.legacyStorageKey);
       }
-      this.selectedProject = 'Primary';
+      if (existingPrimary !== null) {
+        localStorage.removeItem(oldPrimaryKey);
+      }
+
+      this.selectedProjectId = primaryId;
       this.currentTasksString = initialList;
       return;
     }
 
-    const uniqueProjects = Array.from(new Set(storedProjects));
-    if (!uniqueProjects.includes('Primary')) {
-      uniqueProjects.unshift('Primary');
-    }
-    this.projects = uniqueProjects;
-    this.persistProjects();
+    const uniqueProjects = this.deduplicateProjects(storedProjects);
+    const primaryProject = uniqueProjects.find((p) => p.name === 'Primary');
 
-    this.selectedProject = 'Primary';
-    this.currentTasksString = this.getProjectTasks(this.selectedProject);
+    if (!primaryProject) {
+      uniqueProjects.unshift({ id: this.generateUuid(), name: 'Primary' });
+      needsPersist = true;
+    }
+
+    this.projects = uniqueProjects;
+
+    // Always persist if we migrated or added Primary
+    if (needsPersist) {
+      this.persistProjects();
+    }
+
+    this.selectedProjectId = this.projects[0].id;
+    this.currentTasksString = this.getProjectTasks(this.selectedProjectId);
   }
 
-  private switchProject(projectName: string) {
+  private migrateLegacyProjects(legacyProjects: unknown[]): Project[] {
+    const stringProjects = legacyProjects.filter(
+      (item: unknown): item is string =>
+        typeof item === 'string' && item.trim().length > 0
+    );
+
+    return stringProjects.map((name) => {
+      const id = this.generateUuid();
+      const oldKey = this.buildProjectKey(name);
+      const newKey = this.buildProjectKey(id);
+
+      // Migrate data from old key to new key
+      const existingData = localStorage.getItem(oldKey);
+      if (existingData !== null) {
+        localStorage.setItem(newKey, existingData);
+        localStorage.removeItem(oldKey);
+      }
+
+      return { id, name };
+    });
+  }
+
+  private deduplicateProjects(projects: Project[]): Project[] {
+    const seen = new Map<string, Project>();
+    for (const project of projects) {
+      if (!seen.has(project.id)) {
+        seen.set(project.id, project);
+      }
+    }
+    return Array.from(seen.values());
+  }
+
+  private switchProject(projectId: string) {
     this.flushPendingTaskChanges();
-    this.selectedProject = projectName;
-    this.currentTasksString = this.getProjectTasks(projectName);
+    this.selectedProjectId = projectId;
+    this.currentTasksString = this.getProjectTasks(projectId);
   }
 
   private addProject() {
     this.flushPendingTaskChanges();
     const newProjectName = this.generateNextProjectName();
-    this.projects = [...this.projects, newProjectName];
+    const newProjectId = this.generateUuid();
+    const newProject: Project = { id: newProjectId, name: newProjectName };
+    this.projects = [...this.projects, newProject];
     this.persistProjects();
-    this.selectedProject = newProjectName;
+    this.selectedProjectId = newProjectId;
     this.currentTasksString = '';
-    localStorage.setItem(this.buildProjectKey(newProjectName), '');
+    localStorage.setItem(this.buildProjectKey(newProjectId), '');
   }
 
   private generateNextProjectName(): string {
@@ -163,7 +249,7 @@ export class HomePage implements OnInit {
     const usedNumbers = new Set<number>();
 
     this.projects.forEach((project) => {
-      const match = project.match(/^Project (\d+)$/);
+      const match = project.name.match(/^Project (\d+)$/);
       if (match) {
         const parsed = Number.parseInt(match[1], 10);
         if (!Number.isNaN(parsed)) {
@@ -180,8 +266,8 @@ export class HomePage implements OnInit {
     return `${baseName} ${candidate}`;
   }
 
-  private getProjectTasks(projectName: string): string {
-    const stored = localStorage.getItem(this.buildProjectKey(projectName));
+  private getProjectTasks(projectId: string): string {
+    const stored = localStorage.getItem(this.buildProjectKey(projectId));
     return stored ?? '';
   }
 
@@ -192,8 +278,8 @@ export class HomePage implements OnInit {
     );
   }
 
-  private buildProjectKey(projectName: string) {
-    return `${this.projectKeyPrefix}${projectName}`;
+  private buildProjectKey(projectId: string) {
+    return `${this.projectKeyPrefix}${projectId}`;
   }
 
   private flushPendingTaskChanges() {

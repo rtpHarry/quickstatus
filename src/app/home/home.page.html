@@ -15,12 +15,12 @@
   <div id="container">
     <ion-segment
       class="project-segment"
-      [value]="selectedProject"
+      [value]="selectedProjectId"
       (ionChange)="onProjectSegmentChange($event)"
       scrollable="true"
     >
-      <ion-segment-button *ngFor="let project of projects" [value]="project">
-        <ion-label>{{ project }}</ion-label>
+      <ion-segment-button *ngFor="let project of projects" [value]="project.id">
+        <ion-label>{{ project.name }}</ion-label>
       </ion-segment-button>
       <ion-segment-button
         [value]="addProjectSegmentValue"
