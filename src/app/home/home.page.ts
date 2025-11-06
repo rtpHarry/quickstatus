@@ -8,7 +8,12 @@ import {
   IonFooter,
   IonHeader,
   IonIcon,
+  IonItem,
   IonLabel,
+  IonList,
+  IonModal,
+  IonReorder,
+  IonReorderGroup,
   IonSegment,
   IonSegmentButton,
   IonTitle,
@@ -22,6 +27,7 @@ import {
   copyOutline,
   createOutline,
   refreshOutline,
+  reorderThreeOutline,
 } from 'ionicons/icons';
 import { KeyboardShortcutsComponent } from './ui/keyboard-shortcuts/keyboard-shortcuts.component';
 import { TaskListComponent } from './ui/task-list/task-list.component';
@@ -50,18 +56,26 @@ interface Project {
     IonTitle,
     IonContent,
     IonFooter,
+    IonModal,
+    IonList,
+    IonItem,
+    IonReorder,
+    IonReorderGroup,
     TaskListComponent,
     KeyboardShortcutsComponent,
   ],
 })
 export class HomePage implements OnInit {
   @ViewChild(TaskListComponent) taskListComponent?: TaskListComponent;
+  @ViewChild('reorderModal') reorderModal?: IonModal;
 
   projects: Project[] = [];
   selectedProjectId = '';
   currentTasksString = '';
+  reorderProjects: Project[] = [];
 
   readonly addProjectSegmentValue = '__add_project__';
+  readonly reorderProjectSegmentValue = '__reorder_projects__';
 
   private readonly projectsStorageKey = 'taskList:projects';
   private readonly legacyStorageKey = 'taskList';
@@ -75,6 +89,7 @@ export class HomePage implements OnInit {
       refreshOutline,
       addOutline,
       createOutline,
+      reorderThreeOutline,
     });
   }
 
@@ -98,6 +113,11 @@ export class HomePage implements OnInit {
 
     if (value === this.addProjectSegmentValue) {
       this.addProject();
+      return;
+    }
+
+    if (value === this.reorderProjectSegmentValue) {
+      this.showReorderProjectsDialog();
       return;
     }
 
@@ -230,6 +250,28 @@ export class HomePage implements OnInit {
     // Switch to another project (first available)
     this.selectedProjectId = this.projects[0].id;
     this.currentTasksString = this.getProjectTasks(this.selectedProjectId);
+  }
+
+  async showReorderProjectsDialog() {
+    // Make a copy of projects for reordering
+    this.reorderProjects = [...this.projects];
+    await this.reorderModal?.present();
+  }
+
+  handleReorder(event: any) {
+    const itemMove = this.reorderProjects.splice(event.detail.from, 1)[0];
+    this.reorderProjects.splice(event.detail.to, 0, itemMove);
+    event.detail.complete();
+  }
+
+  async saveReorder() {
+    this.projects = [...this.reorderProjects];
+    this.persistProjects();
+    await this.reorderModal?.dismiss();
+  }
+
+  async cancelReorder() {
+    await this.reorderModal?.dismiss();
   }
 
   private generateUuid(): string {
