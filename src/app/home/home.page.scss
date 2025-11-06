@@ -11,3 +11,19 @@
 .project-segment {
   width: 100%;
 }
+
+.active-project {
+  position: relative;
+
+  .edit-icon {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    opacity: 0.7;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 10;
+  }
+}

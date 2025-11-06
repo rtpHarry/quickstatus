@@ -1,6 +1,7 @@
-import { NgFor } from '@angular/common';
+import { NgFor, NgIf } from '@angular/common';
 import { Component, OnInit, ViewChild } from '@angular/core';
 import {
+  AlertController,
   IonButton,
   IonButtons,
   IonContent,
@@ -19,6 +20,7 @@ import {
   addOutline,
   clipboardOutline,
   copyOutline,
+  createOutline,
   refreshOutline,
 } from 'ionicons/icons';
 import { KeyboardShortcutsComponent } from './ui/keyboard-shortcuts/keyboard-shortcuts.component';
@@ -41,6 +43,7 @@ interface Project {
     IonHeader,
     IonToolbar,
     NgFor,
+    NgIf,
     IonSegment,
     IonSegmentButton,
     IonLabel,
@@ -64,13 +67,14 @@ export class HomePage implements OnInit {
   private readonly legacyStorageKey = 'taskList';
   private readonly projectKeyPrefix = 'taskList:';
 
-  constructor() {
+  constructor(private alertController: AlertController) {
     addIcons({
       addCircleOutline,
       copyOutline,
       clipboardOutline,
       refreshOutline,
       addOutline,
+      createOutline,
     });
   }
 
@@ -100,6 +104,65 @@ export class HomePage implements OnInit {
     if (value !== this.selectedProjectId) {
       this.switchProject(value);
     }
+  }
+
+  onEditIconClick(event: Event) {
+    console.log('Edit icon clicked');
+    event.stopPropagation();
+    event.preventDefault();
+    this.showRenameProjectDialog();
+  }
+
+  async showRenameProjectDialog() {
+    const currentProject = this.projects.find(
+      (p) => p.id === this.selectedProjectId
+    );
+    if (!currentProject) {
+      return;
+    }
+
+    const alert = await this.alertController.create({
+      header: 'Rename Project',
+      message: 'Enter a new name for this project',
+      inputs: [
+        {
+          name: 'projectName',
+          type: 'text',
+          placeholder: 'Project name',
+          value: currentProject.name,
+        },
+      ],
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel',
+        },
+        {
+          text: 'Save',
+          handler: (data) => {
+            const newName = data.projectName?.trim();
+            if (newName && newName.length > 0) {
+              this.renameProject(this.selectedProjectId, newName);
+            }
+          },
+        },
+      ],
+    });
+
+    await alert.present();
+  }
+
+  private renameProject(projectId: string, newName: string) {
+    const projectIndex = this.projects.findIndex((p) => p.id === projectId);
+    if (projectIndex === -1) {
+      return;
+    }
+
+    this.projects[projectIndex] = {
+      ...this.projects[projectIndex],
+      name: newName,
+    };
+    this.persistProjects();
   }
 
   private generateUuid(): string {

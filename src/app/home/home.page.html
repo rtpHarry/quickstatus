@@ -19,8 +19,18 @@
       (ionChange)="onProjectSegmentChange($event)"
       scrollable="true"
     >
-      <ion-segment-button *ngFor="let project of projects" [value]="project.id">
+      <ion-segment-button
+        *ngFor="let project of projects"
+        [value]="project.id"
+        [class.active-project]="project.id === selectedProjectId"
+      >
         <ion-label>{{ project.name }}</ion-label>
+        <ion-icon
+          *ngIf="project.id === selectedProjectId"
+          name="create-outline"
+          class="edit-icon"
+          (click)="onEditIconClick($event)"
+        ></ion-icon>
       </ion-segment-button>
       <ion-segment-button
         [value]="addProjectSegmentValue"
