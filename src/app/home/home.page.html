@@ -13,9 +13,26 @@
   </ion-header>
 
   <div id="container">
+    <ion-segment
+      class="project-segment"
+      [value]="selectedProject"
+      (ionChange)="onProjectSegmentChange($event)"
+      scrollable="true"
+    >
+      <ion-segment-button *ngFor="let project of projects" [value]="project">
+        <ion-label>{{ project }}</ion-label>
+      </ion-segment-button>
+      <ion-segment-button
+        [value]="addProjectSegmentValue"
+        class="add-project-button"
+      >
+        <ion-icon name="add-outline"></ion-icon>
+      </ion-segment-button>
+    </ion-segment>
+
     <app-task-list
       #taskList
-      [tasksString]="initialCombinedList"
+      [tasksString]="currentTasksString"
       (listChange)="handleTaskListChange($event)"
     ></app-task-list>
   </div>

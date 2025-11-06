@@ -63,6 +63,7 @@ import { TaskItemComponent } from '../task-item/task-item.component';
 })
 export class TaskListComponent implements OnInit, OnDestroy {
   @Input() set tasksString(value: string) {
+    this.clearListChangeTimer();
     this.tasks = this.parseTasks(value);
   }
   @Output() listChange = new EventEmitter<string>();
@@ -337,6 +338,13 @@ export class TaskListComponent implements OnInit, OnDestroy {
     if (this.listChangeTimer) {
       clearTimeout(this.listChangeTimer);
       this.listChangeTimer = null;
+    }
+  }
+
+  public flushPendingChanges(): void {
+    if (this.listChangeTimer) {
+      this.clearListChangeTimer();
+      this.emitListChange();
     }
   }
 
