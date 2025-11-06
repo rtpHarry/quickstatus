@@ -3,6 +3,7 @@ import {
   Component,
   EventEmitter,
   Input,
+  OnDestroy,
   OnInit,
   Output,
   ViewChild,
@@ -60,7 +61,7 @@ import { TaskItemComponent } from '../task-item/task-item.component';
     FormsModule,
   ],
 })
-export class TaskListComponent implements OnInit {
+export class TaskListComponent implements OnInit, OnDestroy {
   @Input() set tasksString(value: string) {
     this.tasks = this.parseTasks(value);
   }
@@ -68,6 +69,8 @@ export class TaskListComponent implements OnInit {
 
   tasks: { status: string; text: string; private?: boolean }[] = [];
   pastedContent = '';
+  private listChangeTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly listChangeDebounceMs = 300;
 
   @ViewChild(IonModal) modal!: IonModal;
   @ViewChild('pasteTextarea') pasteTextarea!: IonTextarea;
@@ -86,6 +89,10 @@ export class TaskListComponent implements OnInit {
   }
 
   ngOnInit() {}
+
+  ngOnDestroy() {
+    this.clearListChangeTimer();
+  }
 
   addTask(index?: number) {
     const newTask = { status: '❌', text: '', private: false };
@@ -151,7 +158,7 @@ export class TaskListComponent implements OnInit {
 
   onTaskChange(updatedTask: any, index: number) {
     this.tasks[index] = updatedTask;
-    this.emitListChange();
+    this.scheduleListChangeEmit();
   }
 
   deleteTask(index: number) {
@@ -308,6 +315,7 @@ export class TaskListComponent implements OnInit {
   }
 
   private emitListChange() {
+    this.clearListChangeTimer();
     const combined = this.tasks
       .map((t) => {
         const privateFlag = t.private ?? false ? '🔒' : '';
@@ -315,6 +323,21 @@ export class TaskListComponent implements OnInit {
       })
       .join('\n');
     this.listChange.emit(combined);
+  }
+
+  private scheduleListChangeEmit() {
+    this.clearListChangeTimer();
+    this.listChangeTimer = setTimeout(() => {
+      this.listChangeTimer = null;
+      this.emitListChange();
+    }, this.listChangeDebounceMs);
+  }
+
+  private clearListChangeTimer() {
+    if (this.listChangeTimer) {
+      clearTimeout(this.listChangeTimer);
+      this.listChangeTimer = null;
+    }
   }
 
   private async showToast(message: string) {
