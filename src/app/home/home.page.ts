@@ -138,6 +138,14 @@ export class HomePage implements OnInit {
           role: 'cancel',
         },
         {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            this.confirmDeleteProject();
+            return false; // Prevent alert from closing
+          },
+        },
+        {
           text: 'Save',
           handler: (data) => {
             const newName = data.projectName?.trim();
@@ -163,6 +171,65 @@ export class HomePage implements OnInit {
       name: newName,
     };
     this.persistProjects();
+  }
+
+  async confirmDeleteProject() {
+    const currentProject = this.projects.find(
+      (p) => p.id === this.selectedProjectId
+    );
+    if (!currentProject) {
+      return;
+    }
+
+    // Prevent deleting the last project
+    if (this.projects.length === 1) {
+      const alert = await this.alertController.create({
+        header: 'Cannot Delete',
+        message: 'You must have at least one project.',
+        buttons: ['OK'],
+      });
+      await alert.present();
+      return;
+    }
+
+    const alert = await this.alertController.create({
+      header: 'Delete Project',
+      message: `Are you sure you want to delete "${currentProject.name}"? All tasks in this project will be permanently deleted.`,
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel',
+        },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            this.deleteProject(this.selectedProjectId);
+          },
+        },
+      ],
+    });
+
+    await alert.present();
+  }
+
+  private deleteProject(projectId: string) {
+    const projectIndex = this.projects.findIndex((p) => p.id === projectId);
+    if (projectIndex === -1) {
+      return;
+    }
+
+    // Remove project from array
+    this.projects.splice(projectIndex, 1);
+    this.persistProjects();
+
+    // Clean up localStorage for this project
+    const projectKey = this.buildProjectKey(projectId);
+    localStorage.removeItem(projectKey);
+
+    // Switch to another project (first available)
+    this.selectedProjectId = this.projects[0].id;
+    this.currentTasksString = this.getProjectTasks(this.selectedProjectId);
   }
 
   private generateUuid(): string {
