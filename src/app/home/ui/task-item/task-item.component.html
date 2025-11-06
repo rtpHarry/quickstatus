@@ -26,11 +26,8 @@
         <ion-button
           fill="solid"
           (click)="togglePrivate()"
-          [class]="
-            task.private ?? false
-              ? 'private-button-active'
-              : 'private-button-inactive'
-          "
+          class="private-button"
+          [class.active]="task.private === true"
           title="Toggle private (excludes from copy)"
           size="small"
         >
