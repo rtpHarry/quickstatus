@@ -79,7 +79,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
   tasks: { status: string; text: string; private?: boolean }[] = [];
   pastedContent = '';
   private listChangeTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly listChangeDebounceMs = 300;
+  private readonly listChangeDebounceMs = 750;
 
   @ViewChild(IonModal) modal!: IonModal;
   @ViewChild('pasteTextarea') pasteTextarea!: IonTextarea;
