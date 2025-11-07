@@ -62,7 +62,15 @@ import { TaskItemComponent } from '../task-item/task-item.component';
   ],
 })
 export class TaskListComponent implements OnInit, OnDestroy {
+  private _lastTasksString = '';
+
   @Input() set tasksString(value: string) {
+    // Don't re-parse if the string hasn't actually changed
+    // This prevents re-rendering when the parent passes back our own emitted value
+    if (this._lastTasksString === value) {
+      return;
+    }
+    this._lastTasksString = value;
     this.clearListChangeTimer();
     this.tasks = this.parseTasks(value);
   }
@@ -323,6 +331,8 @@ export class TaskListComponent implements OnInit, OnDestroy {
         return `${t.status} ${t.text} ${privateFlag}`.trim();
       })
       .join('\n');
+    // Update the cached value so we don't re-parse when parent passes it back
+    this._lastTasksString = combined;
     this.listChange.emit(combined);
   }
 
