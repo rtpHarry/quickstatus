@@ -68,6 +68,7 @@ interface Project {
 export class HomePage implements OnInit {
   @ViewChild(TaskListComponent) taskListComponent?: TaskListComponent;
   @ViewChild('reorderModal') reorderModal?: IonModal;
+  @ViewChild(IonSegment) segment?: IonSegment;
 
   projects: Project[] = [];
   selectedProjectId = '';
@@ -256,6 +257,13 @@ export class HomePage implements OnInit {
     // Make a copy of projects for reordering
     this.reorderProjects = [...this.projects];
     await this.reorderModal?.present();
+
+    // Reset segment back to selected project (it was changed to reorder button value)
+    setTimeout(() => {
+      if (this.segment) {
+        this.segment.value = this.selectedProjectId;
+      }
+    }, 0);
   }
 
   handleReorder(event: any) {
@@ -414,6 +422,13 @@ export class HomePage implements OnInit {
     this.selectedProjectId = newProjectId;
     this.currentTasksString = '';
     localStorage.setItem(this.buildProjectKey(newProjectId), '');
+
+    // Reset segment to the new project
+    setTimeout(() => {
+      if (this.segment) {
+        this.segment.value = newProjectId;
+      }
+    }, 0);
   }
 
   private generateNextProjectName(): string {
