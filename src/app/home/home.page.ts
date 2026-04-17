@@ -23,6 +23,7 @@ import { addIcons } from 'ionicons';
 import {
   addCircleOutline,
   addOutline,
+  arrowUndoOutline,
   clipboardOutline,
   copyOutline,
   createOutline,
@@ -31,10 +32,23 @@ import {
 } from 'ionicons/icons';
 import { KeyboardShortcutsComponent } from './ui/keyboard-shortcuts/keyboard-shortcuts.component';
 import { TaskListComponent } from './ui/task-list/task-list.component';
+import {
+  ensureTaskListHasPlaceholder,
+  parseTasksString,
+  stringifyTasks,
+  Task,
+  TaskDeleteEvent,
+} from './ui/task-list/task-list.utils';
 
 interface Project {
   id: string;
   name: string;
+}
+
+interface DeletedTaskEntry {
+  projectId: string;
+  index: number;
+  task: Task;
 }
 
 @Component({
@@ -74,6 +88,7 @@ export class HomePage implements OnInit {
   selectedProjectId = '';
   currentTasksString = '';
   reorderProjects: Project[] = [];
+  deleteHistoryByProject: Record<string, DeletedTaskEntry[]> = {};
 
   readonly addProjectSegmentValue = '__add_project__';
   readonly reorderProjectSegmentValue = '__reorder_projects__';
@@ -85,6 +100,7 @@ export class HomePage implements OnInit {
   constructor(private alertController: AlertController) {
     addIcons({
       addCircleOutline,
+      arrowUndoOutline,
       copyOutline,
       clipboardOutline,
       refreshOutline,
@@ -99,10 +115,73 @@ export class HomePage implements OnInit {
   }
 
   handleTaskListChange(combinedList: string) {
-    this.currentTasksString = combinedList;
-    localStorage.setItem(
-      this.buildProjectKey(this.selectedProjectId),
-      combinedList
+    this.persistTaskString(this.selectedProjectId, combinedList);
+  }
+
+  handleTaskDeleteRequest(event: TaskDeleteEvent) {
+    if (!this.selectedProjectId) {
+      return;
+    }
+
+    this.flushPendingTaskChanges();
+
+    const tasks = parseTasksString(this.currentTasksString);
+    const deletedTask = tasks[event.index] ?? event.task;
+    if (!deletedTask) {
+      return;
+    }
+
+    tasks.splice(event.index, 1);
+    this.pushDeletedTask({
+      projectId: this.selectedProjectId,
+      index: event.index,
+      task: { ...deletedTask },
+    });
+
+    this.taskListComponent?.setPendingFocusIndex(event.nextFocusIndex);
+    this.persistTaskString(
+      this.selectedProjectId,
+      stringifyTasks(ensureTaskListHasPlaceholder(tasks))
+    );
+  }
+
+  undoDelete() {
+    const history = this.deleteHistoryByProject[this.selectedProjectId];
+    if (!history || history.length === 0) {
+      return;
+    }
+
+    this.flushPendingTaskChanges();
+
+    const deletedEntry = history.pop();
+    if (!deletedEntry) {
+      return;
+    }
+
+    const tasks = parseTasksString(this.currentTasksString);
+    const isPlaceholderOnly =
+      tasks.length === 1 &&
+      tasks[0].text === '' &&
+      tasks[0].status === '❌' &&
+      !(tasks[0].private ?? false);
+    const workingTasks = isPlaceholderOnly ? [] : [...tasks];
+    const insertIndex = Math.min(
+      Math.max(deletedEntry.index, 0),
+      workingTasks.length
+    );
+
+    workingTasks.splice(insertIndex, 0, { ...deletedEntry.task });
+
+    this.taskListComponent?.setPendingFocusIndex(insertIndex);
+    this.persistTaskString(
+      this.selectedProjectId,
+      stringifyTasks(workingTasks)
+    );
+  }
+
+  hasUndoHistoryForActiveProject(): boolean {
+    return (
+      (this.deleteHistoryByProject[this.selectedProjectId]?.length ?? 0) > 0
     );
   }
 
@@ -247,6 +326,7 @@ export class HomePage implements OnInit {
     // Clean up localStorage for this project
     const projectKey = this.buildProjectKey(projectId);
     localStorage.removeItem(projectKey);
+    delete this.deleteHistoryByProject[projectId];
 
     // Switch to another project (first available)
     this.selectedProjectId = this.projects[0].id;
@@ -339,6 +419,7 @@ export class HomePage implements OnInit {
       const initialList = legacyList ?? existingPrimary ?? '';
 
       this.projects = [{ id: primaryId, name: 'Primary' }];
+      this.deleteHistoryByProject[primaryId] = [];
       this.persistProjects();
       localStorage.setItem(primaryKey, initialList);
 
@@ -364,6 +445,9 @@ export class HomePage implements OnInit {
     }
 
     this.projects = uniqueProjects;
+    this.projects.forEach((project) => {
+      this.deleteHistoryByProject[project.id] ??= [];
+    });
 
     // Always persist if we migrated or added Primary
     if (needsPersist) {
@@ -418,6 +502,7 @@ export class HomePage implements OnInit {
     const newProjectId = this.generateUuid();
     const newProject: Project = { id: newProjectId, name: newProjectName };
     this.projects = [...this.projects, newProject];
+    this.deleteHistoryByProject[newProjectId] = [];
     this.persistProjects();
     this.selectedProjectId = newProjectId;
     this.currentTasksString = '';
@@ -463,6 +548,16 @@ export class HomePage implements OnInit {
       this.projectsStorageKey,
       JSON.stringify(this.projects)
     );
+  }
+
+  private persistTaskString(projectId: string, taskString: string) {
+    this.currentTasksString = taskString;
+    localStorage.setItem(this.buildProjectKey(projectId), taskString);
+  }
+
+  private pushDeletedTask(entry: DeletedTaskEntry) {
+    this.deleteHistoryByProject[entry.projectId] ??= [];
+    this.deleteHistoryByProject[entry.projectId].push(entry);
   }
 
   private buildProjectKey(projectId: string) {

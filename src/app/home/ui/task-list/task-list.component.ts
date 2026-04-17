@@ -4,7 +4,6 @@ import {
   EventEmitter,
   Input,
   OnDestroy,
-  OnInit,
   Output,
   ViewChild,
 } from '@angular/core';
@@ -36,6 +35,13 @@ import {
   trashOutline,
 } from 'ionicons/icons';
 import { TaskItemComponent } from '../task-item/task-item.component';
+import {
+  createEmptyTask,
+  parseTasksString,
+  stringifyTasks,
+  Task,
+  TaskDeleteEvent,
+} from './task-list.utils';
 
 @Component({
   selector: 'app-task-list',
@@ -61,8 +67,9 @@ import { TaskItemComponent } from '../task-item/task-item.component';
     FormsModule,
   ],
 })
-export class TaskListComponent implements OnInit, OnDestroy {
+export class TaskListComponent implements OnDestroy {
   private _lastTasksString = '';
+  private pendingFocusIndex: number | null = null;
 
   @Input() set tasksString(value: string) {
     // Don't re-parse if the string hasn't actually changed
@@ -72,11 +79,13 @@ export class TaskListComponent implements OnInit, OnDestroy {
     }
     this._lastTasksString = value;
     this.clearListChangeTimer();
-    this.tasks = this.parseTasks(value);
+    this.tasks = parseTasksString(value);
+    this.focusPendingInput();
   }
   @Output() listChange = new EventEmitter<string>();
+  @Output() deleteTaskRequest = new EventEmitter<TaskDeleteEvent>();
 
-  tasks: { status: string; text: string; private?: boolean }[] = [];
+  tasks: Task[] = [];
   pastedContent = '';
   private listChangeTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly listChangeDebounceMs = 750;
@@ -97,14 +106,12 @@ export class TaskListComponent implements OnInit, OnDestroy {
     });
   }
 
-  ngOnInit() {}
-
   ngOnDestroy() {
     this.clearListChangeTimer();
   }
 
   addTask(index?: number) {
-    const newTask = { status: '❌', text: '', private: false };
+    const newTask = createEmptyTask();
     if (index !== undefined) {
       this.tasks.splice(index + 1, 0, newTask);
       setTimeout(() => {
@@ -131,7 +138,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
   }
 
   handleDeleteKey(index: number) {
-    this.deleteTask(index);
+    this.requestDeleteTask(index);
   }
 
   handleUpArrow(index: number) {
@@ -165,49 +172,29 @@ export class TaskListComponent implements OnInit, OnDestroy {
     this.emitListChange();
   }
 
-  onTaskChange(updatedTask: any, index: number) {
+  onTaskChange(updatedTask: Task, index: number) {
     this.tasks[index] = updatedTask;
     this.scheduleListChangeEmit();
   }
 
-  deleteTask(index: number) {
-    // Store the length before deletion to check conditions
-    const originalLength = this.tasks.length;
+  requestDeleteTask(index: number) {
+    const task = this.tasks[index];
+    if (!task) {
+      return;
+    }
 
-    // Determine which item to focus after deletion
-    let nextFocusIndex: number;
-
+    let nextFocusIndex = 0;
     if (index > 0) {
-      // If not the first item, focus on previous item
       nextFocusIndex = index - 1;
-    } else if (originalLength > 1) {
-      // If first item but not the only item, focus on the new first item (still at index 0)
-      nextFocusIndex = 0;
-    } else {
-      // If it's the only item, we'll add a new empty one and focus on it
+    } else if (this.tasks.length > 1) {
       nextFocusIndex = 0;
     }
 
-    // Delete the task
-    this.tasks.splice(index, 1);
-
-    // If list is empty after deletion, add a new empty task
-    if (this.tasks.length === 0) {
-      this.tasks.push({ status: '❌', text: '', private: false });
-    }
-
-    // Update the list
-    this.emitListChange();
-
-    // Set focus after the DOM updates
-    setTimeout(() => {
-      const inputs = document.querySelectorAll('ion-input');
-      if (inputs.length > nextFocusIndex) {
-        const inputToFocus = inputs[nextFocusIndex] as HTMLIonInputElement;
-        if (inputToFocus) {
-          inputToFocus.setFocus();
-        }
-      }
+    this.pendingFocusIndex = nextFocusIndex;
+    this.deleteTaskRequest.emit({
+      index,
+      nextFocusIndex,
+      task: { ...task },
     });
   }
 
@@ -259,7 +246,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
         {
           text: 'Yes',
           handler: () => {
-            this.tasks = [{ status: '❌', text: '', private: false }];
+            this.tasks = [createEmptyTask()];
             this.emitListChange();
           },
         },
@@ -276,7 +263,7 @@ export class TaskListComponent implements OnInit, OnDestroy {
 
   confirmPaste() {
     try {
-      this.tasks = this.parseTasks(this.pastedContent);
+      this.tasks = parseTasksString(this.pastedContent);
     } catch (e) {
       console.error('Failed to parse tasks:', e);
     }
@@ -298,39 +285,9 @@ export class TaskListComponent implements OnInit, OnDestroy {
     }, 150);
   }
 
-  private parseTasks(
-    value: string
-  ): { status: string; text: string; private?: boolean }[] {
-    // Handle empty or whitespace-only input by returning a default task
-    if (!value || value.trim() === '') {
-      return [{ status: '❌', text: '', private: false }];
-    }
-
-    return value.split('\n').map((item) => {
-      // Check if the line contains private flag (🔒)
-      const isPrivate = item.includes('🔒');
-      // Remove the private flag from the item for parsing
-      const cleanItem = item.replace('🔒', '').trim();
-
-      const [status, ...textParts] = cleanItem.split(/\s+/);
-      // Ensure status has a default value if undefined or empty
-      const taskStatus = status && status.trim() !== '' ? status : '❌';
-      return {
-        status: taskStatus,
-        text: textParts.join(' '),
-        private: isPrivate,
-      };
-    });
-  }
-
   private emitListChange() {
     this.clearListChangeTimer();
-    const combined = this.tasks
-      .map((t) => {
-        const privateFlag = t.private ?? false ? '🔒' : '';
-        return `${t.status} ${t.text} ${privateFlag}`.trim();
-      })
-      .join('\n');
+    const combined = stringifyTasks(this.tasks);
     // Update the cached value so we don't re-parse when parent passes it back
     this._lastTasksString = combined;
     this.listChange.emit(combined);
@@ -356,6 +313,27 @@ export class TaskListComponent implements OnInit, OnDestroy {
       this.clearListChangeTimer();
       this.emitListChange();
     }
+  }
+
+  public setPendingFocusIndex(index: number): void {
+    this.pendingFocusIndex = index;
+  }
+
+  private focusPendingInput() {
+    if (this.pendingFocusIndex === null) {
+      return;
+    }
+
+    const focusIndex = this.pendingFocusIndex;
+    this.pendingFocusIndex = null;
+
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('ion-input');
+      if (inputs.length > focusIndex) {
+        const inputToFocus = inputs[focusIndex] as HTMLIonInputElement;
+        inputToFocus?.setFocus();
+      }
+    });
   }
 
   private async showToast(message: string) {

@@ -50,6 +50,7 @@
       #taskList
       [tasksString]="currentTasksString"
       (listChange)="handleTaskListChange($event)"
+      (deleteTaskRequest)="handleTaskDeleteRequest($event)"
     ></app-task-list>
   </div>
 
@@ -84,6 +85,14 @@
 <ion-footer>
   <ion-toolbar>
     <ion-buttons slot="end">
+      <ion-button
+        (click)="undoDelete()"
+        [disabled]="!hasUndoHistoryForActiveProject()"
+        [class.undo-button-hidden]="!hasUndoHistoryForActiveProject()"
+      >
+        <ion-icon slot="start" name="arrow-undo-outline"></ion-icon>
+        Undo Delete
+      </ion-button>
       <ion-button (click)="taskList.addTask()">
         <ion-icon slot="start" name="add-circle-outline"></ion-icon>
         Add Task

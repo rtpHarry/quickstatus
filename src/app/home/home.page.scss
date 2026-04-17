@@ -12,6 +12,15 @@
   width: 100%;
 }
 
+ion-footer ion-buttons {
+  flex-wrap: wrap;
+}
+
+.undo-button-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .active-project {
   position: relative;
 
