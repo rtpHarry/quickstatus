@@ -437,19 +437,13 @@ export class HomePage implements OnInit {
     }
 
     const uniqueProjects = this.deduplicateProjects(storedProjects);
-    const primaryProject = uniqueProjects.find((p) => p.name === 'Primary');
-
-    if (!primaryProject) {
-      uniqueProjects.unshift({ id: this.generateUuid(), name: 'Primary' });
-      needsPersist = true;
-    }
 
     this.projects = uniqueProjects;
     this.projects.forEach((project) => {
       this.deleteHistoryByProject[project.id] ??= [];
     });
 
-    // Always persist if we migrated or added Primary
+    // Persist if we migrated legacy storage into the current format
     if (needsPersist) {
       this.persistProjects();
     }
