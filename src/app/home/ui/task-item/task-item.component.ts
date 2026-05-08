@@ -13,7 +13,7 @@ import {
   IonSegmentButton,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { textOutline } from 'ionicons/icons';
+import { lockClosedOutline, lockOpenOutline, textOutline } from 'ionicons/icons';
 
 @Component({
   selector: 'app-task-item',
@@ -54,6 +54,8 @@ export class TaskItemComponent implements OnInit {
 
   constructor() {
     addIcons({
+      lockClosedOutline,
+      lockOpenOutline,
       textOutline,
     });
   }

@@ -51,7 +51,9 @@
           title="Toggle private (excludes from copy)"
           size="small"
         >
-          🔒
+          <ion-icon
+            [name]="task.private === true ? 'lock-closed-outline' : 'lock-open-outline'"
+          ></ion-icon>
         </ion-button>
       </ion-col>
     </ion-row>
