@@ -93,8 +93,12 @@ export class TaskItemComponent implements OnInit {
     const isDeleteKey = event.key === 'Backspace' || event.key === 'Delete';
     const isCtrlPressed = event.ctrlKey;
     const isEmpty = !this.task.text || this.task.text.trim() === '';
+    const key = event.key.toLowerCase();
 
-    if (isDeleteKey) {
+    if (isCtrlPressed && key === 'p') {
+      event.preventDefault();
+      this.togglePrivate();
+    } else if (isDeleteKey) {
       if (isCtrlPressed) {
         // Existing functionality: delete with Ctrl+Backspace/Delete
         event.preventDefault();
