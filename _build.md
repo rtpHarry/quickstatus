@@ -1,6 +1,8 @@
 use npm commands.
 
-Build with:
+Bump version in package.json
+
+chore(release): deploy vX.X.X
 
 npm run build
 
