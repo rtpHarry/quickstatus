@@ -39,13 +39,13 @@ export class TaskItemComponent implements OnInit {
     status: string;
     text: string;
     private?: boolean;
-    sectionTitle?: boolean;
+    sectionHeading?: boolean;
   };
   @Output() taskChange = new EventEmitter<{
     status: string;
     text: string;
     private?: boolean;
-    sectionTitle?: boolean;
+    sectionHeading?: boolean;
   }>();
   @Output() enterKey = new EventEmitter<void>();
   @Output() deleteKey = new EventEmitter<void>();
@@ -76,8 +76,8 @@ export class TaskItemComponent implements OnInit {
     this.emitChange();
   }
 
-  toggleSectionTitle() {
-    this.task.sectionTitle = !(this.task.sectionTitle ?? false);
+  toggleSectionHeading() {
+    this.task.sectionHeading = !(this.task.sectionHeading ?? false);
     this.emitChange();
   }
 
@@ -98,6 +98,9 @@ export class TaskItemComponent implements OnInit {
     if (isCtrlPressed && key === 'p') {
       event.preventDefault();
       this.togglePrivate();
+    } else if (isCtrlPressed && key === 'h') {
+      event.preventDefault();
+      this.toggleSectionHeading();
     } else if (isDeleteKey) {
       if (isCtrlPressed) {
         // Existing functionality: delete with Ctrl+Backspace/Delete

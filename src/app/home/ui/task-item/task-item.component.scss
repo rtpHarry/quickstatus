@@ -3,21 +3,21 @@
   --inner-border-width: 0;
 }
 
-.task-row.section-title-row {
+.task-row.section-heading-row {
   --inner-border-width: 0;
 }
 
-.section-title-input {
+.section-heading-input {
   font-size: 18px;
   font-weight: 700;
 }
 
-:host ::ng-deep ion-input.section-title-input .native-input {
+:host ::ng-deep ion-input.section-heading-input .native-input {
   font-size: 18px;
   font-weight: 700;
 }
 
-.section-title-button,
+.section-heading-button,
 .private-button {
   --border-radius: 6px;
   min-height: 32px;

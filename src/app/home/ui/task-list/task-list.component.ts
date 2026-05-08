@@ -203,7 +203,9 @@ export class TaskListComponent implements OnDestroy {
     const publicTasks = this.tasks.filter((t) => !(t.private ?? false));
     const combined = publicTasks
       .map((t) =>
-        t.sectionTitle === true ? `🏷️  Section: ${t.text}` : `${t.status}  ${t.text}`
+        t.sectionHeading === true
+          ? `🏷️  Section: ${t.text}`
+          : `${t.status}  ${t.text}`
       )
       .join('\n');
     this.copyTextToClipboard(

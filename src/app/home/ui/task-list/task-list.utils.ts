@@ -1,11 +1,11 @@
 const privateFlagMarker = '🔒';
-const sectionTitleFlagMarker = '🏷️';
+const sectionHeadingFlagMarker = '🏷️';
 
 export interface Task {
   status: string;
   text: string;
   private?: boolean;
-  sectionTitle?: boolean;
+  sectionHeading?: boolean;
 }
 
 export interface TaskDeleteEvent {
@@ -15,7 +15,7 @@ export interface TaskDeleteEvent {
 }
 
 export function createEmptyTask(): Task {
-  return { status: '❌', text: '', private: false, sectionTitle: false };
+  return { status: '❌', text: '', private: false, sectionHeading: false };
 }
 
 export function ensureTaskListHasPlaceholder(tasks: Task[]): Task[] {
@@ -28,7 +28,8 @@ export function parseTasksString(value: string): Task[] {
   }
 
   return value.split('\n').map((item) => {
-    const { cleanItem, isPrivate, isSectionTitle } = extractTrailingFlags(item);
+    const { cleanItem, isPrivate, isSectionHeading } =
+      extractTrailingFlags(item);
     const [status, ...textParts] = cleanItem.split(/\s+/);
     const taskStatus = status && status.trim() !== '' ? status : '❌';
 
@@ -36,7 +37,7 @@ export function parseTasksString(value: string): Task[] {
       status: taskStatus,
       text: textParts.join(' '),
       private: isPrivate,
-      sectionTitle: isSectionTitle,
+      sectionHeading: isSectionHeading,
     };
   });
 }
@@ -45,9 +46,9 @@ export function stringifyTasks(tasks: Task[]): string {
   return ensureTaskListHasPlaceholder(tasks)
     .map((task) => {
       const privateFlag = task.private ?? false ? privateFlagMarker : '';
-      const sectionTitleFlag =
-        task.sectionTitle ?? false ? sectionTitleFlagMarker : '';
-      return `${task.status} ${task.text} ${sectionTitleFlag} ${privateFlag}`.trim();
+      const sectionHeadingFlag =
+        task.sectionHeading ?? false ? sectionHeadingFlagMarker : '';
+      return `${task.status} ${task.text} ${sectionHeadingFlag} ${privateFlag}`.trim();
     })
     .join('\n');
 }
@@ -55,11 +56,11 @@ export function stringifyTasks(tasks: Task[]): string {
 function extractTrailingFlags(item: string): {
   cleanItem: string;
   isPrivate: boolean;
-  isSectionTitle: boolean;
+  isSectionHeading: boolean;
 } {
   let cleanItem = item.trim();
   let isPrivate = false;
-  let isSectionTitle = false;
+  let isSectionHeading = false;
 
   while (true) {
     if (cleanItem.endsWith(privateFlagMarker)) {
@@ -68,14 +69,14 @@ function extractTrailingFlags(item: string): {
       continue;
     }
 
-    if (cleanItem.endsWith(sectionTitleFlagMarker)) {
-      isSectionTitle = true;
-      cleanItem = cleanItem.slice(0, -sectionTitleFlagMarker.length).trim();
+    if (cleanItem.endsWith(sectionHeadingFlagMarker)) {
+      isSectionHeading = true;
+      cleanItem = cleanItem.slice(0, -sectionHeadingFlagMarker.length).trim();
       continue;
     }
 
     break;
   }
 
-  return { cleanItem, isPrivate, isSectionTitle };
+  return { cleanItem, isPrivate, isSectionHeading };
 }

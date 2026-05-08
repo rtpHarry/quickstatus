@@ -2,7 +2,7 @@
   lines="none"
   class="task-row"
   [class.private-row]="task.private === true"
-  [class.section-title-row]="task.sectionTitle === true"
+  [class.section-heading-row]="task.sectionHeading === true"
 >
   <ion-grid>
     <ion-row class="ion-align-items-center">
@@ -10,7 +10,7 @@
         <ion-segment
           [(ngModel)]="task.status"
           (ionChange)="emitChange()"
-          [disabled]="task.sectionTitle === true"
+          [disabled]="task.sectionHeading === true"
         >
           <ion-segment-button value="✅">✅</ion-segment-button>
           <ion-segment-button value="☑️">☑️</ion-segment-button>
@@ -19,7 +19,7 @@
       </ion-col>
       <ion-col>
         <ion-input
-          [class.section-title-input]="task.sectionTitle === true"
+          [class.section-heading-input]="task.sectionHeading === true"
           style="width: 100%"
           [(ngModel)]="task.text"
           (ionInput)="emitChange()"
@@ -35,10 +35,10 @@
       <ion-col size="auto">
         <ion-button
           fill="solid"
-          (click)="toggleSectionTitle()"
-          class="section-title-button"
-          [class.active]="task.sectionTitle === true"
-          title="Toggle section title"
+          (click)="toggleSectionHeading()"
+          class="section-heading-button"
+          [class.active]="task.sectionHeading === true"
+          title="Toggle section heading"
           size="small"
         >
           <ion-icon name="text-outline"></ion-icon>
