@@ -31,11 +31,17 @@ import {
   ],
 })
 export class TaskItemComponent implements OnInit {
-  @Input() task!: { status: string; text: string; private?: boolean };
+  @Input() task!: {
+    status: string;
+    text: string;
+    private?: boolean;
+    sectionTitle?: boolean;
+  };
   @Output() taskChange = new EventEmitter<{
     status: string;
     text: string;
     private?: boolean;
+    sectionTitle?: boolean;
   }>();
   @Output() enterKey = new EventEmitter<void>();
   @Output() deleteKey = new EventEmitter<void>();
@@ -57,6 +63,11 @@ export class TaskItemComponent implements OnInit {
   togglePrivate() {
     // Handle graceful upgrade for existing data without private field
     this.task.private = !(this.task.private ?? false);
+    this.emitChange();
+  }
+
+  toggleSectionTitle() {
+    this.task.sectionTitle = !(this.task.sectionTitle ?? false);
     this.emitChange();
   }
 
