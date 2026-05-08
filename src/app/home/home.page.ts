@@ -444,6 +444,7 @@ export class HomePage implements OnInit {
     this.projects.forEach((project) => {
       this.deleteHistoryByProject[project.id] ??= [];
     });
+    this.removeOrphanedProjectTaskStorage(this.projects);
 
     // Persist if we migrated legacy storage into the current format
     if (needsPersist) {
@@ -544,6 +545,19 @@ export class HomePage implements OnInit {
       this.projectsStorageKey,
       JSON.stringify(this.projects)
     );
+  }
+
+  private removeOrphanedProjectTaskStorage(projects: Project[]) {
+    const projectIds = new Set(projects.map((project) => project.id));
+
+    Object.keys(localStorage)
+      .filter(
+        (key) =>
+          key.startsWith(this.projectKeyPrefix) &&
+          key !== this.projectsStorageKey &&
+          !projectIds.has(key.slice(this.projectKeyPrefix.length))
+      )
+      .forEach((key) => localStorage.removeItem(key));
   }
 
   private persistTaskString(projectId: string, taskString: string) {
