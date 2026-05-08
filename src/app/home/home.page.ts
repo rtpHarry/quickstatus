@@ -23,6 +23,7 @@ import { addIcons } from 'ionicons';
 import {
   addCircleOutline,
   addOutline,
+  archiveOutline,
   arrowUndoOutline,
   clipboardOutline,
   copyOutline,
@@ -100,6 +101,7 @@ export class HomePage implements OnInit {
   constructor(private alertController: AlertController) {
     addIcons({
       addCircleOutline,
+      archiveOutline,
       arrowUndoOutline,
       copyOutline,
       clipboardOutline,

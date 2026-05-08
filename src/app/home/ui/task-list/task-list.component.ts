@@ -206,22 +206,83 @@ export class TaskListComponent implements OnDestroy {
         t.sectionTitle === true ? `🏷️  Section: ${t.text}` : `${t.status}  ${t.text}`
       )
       .join('\n');
+    this.copyTextToClipboard(
+      combined,
+      'List copied to clipboard (private items excluded)'
+    );
+  }
+
+  copyBackupToClipboard() {
+    this.flushPendingChanges();
+    const backupData: Record<string, string> = {};
+    const projectsKey = 'taskList:projects';
+    const projectsValue = localStorage.getItem(projectsKey);
+
+    if (projectsValue !== null) {
+      backupData[projectsKey] = projectsValue;
+
+      try {
+        const projects = JSON.parse(projectsValue);
+        if (Array.isArray(projects)) {
+          projects.forEach((project) => {
+            if (
+              typeof project === 'object' &&
+              project !== null &&
+              typeof project.id === 'string'
+            ) {
+              const taskKey = `taskList:${project.id}`;
+              const taskValue = localStorage.getItem(taskKey);
+              if (taskValue !== null) {
+                backupData[taskKey] = taskValue;
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Failed to parse projects for backup:', error);
+      }
+    }
+
+    const backup = JSON.stringify(backupData, null, 2);
+    const restoreSnippet = `(() => {
+  const backup = JSON.parse(
+    \`${this.escapeTemplateLiteralContent(backup)}\`,
+  );
+
+  Object.keys(backup).forEach((key) => {
+    localStorage.setItem(key, backup[key]);
+  });
+
+  location.reload();
+})();`;
+
+    this.copyTextToClipboard(restoreSnippet, 'Backup copied to clipboard');
+  }
+
+  private escapeTemplateLiteralContent(value: string): string {
+    return value
+      .replace(/\\/g, '\\\\')
+      .replace(/`/g, '\\`')
+      .replace(/\$\{/g, '\\${');
+  }
+
+  copyTextToClipboard(text: string, successMessage: string) {
     if (navigator.clipboard) {
       navigator.clipboard
-        .writeText(combined)
+        .writeText(text)
         .then(() => {
-          this.showToast('List copied to clipboard (private items excluded)');
+          this.showToast(successMessage);
         })
         .catch((err) => {
           console.error('Failed to copy: ', err);
-          this.fallbackCopyTextToClipboard(combined);
+          this.fallbackCopyTextToClipboard(text, successMessage);
         });
     } else {
-      this.fallbackCopyTextToClipboard(combined);
+      this.fallbackCopyTextToClipboard(text, successMessage);
     }
   }
 
-  fallbackCopyTextToClipboard(text: string) {
+  fallbackCopyTextToClipboard(text: string, successMessage = 'Copied to clipboard') {
     const textArea = document.createElement('textarea');
     textArea.value = text;
     document.body.appendChild(textArea);
@@ -229,7 +290,7 @@ export class TaskListComponent implements OnDestroy {
     textArea.select();
     try {
       document.execCommand('copy');
-      this.showToast('List copied to clipboard');
+      this.showToast(successMessage);
     } catch (err) {
       console.error('Fallback: Oops, unable to copy', err);
     }
