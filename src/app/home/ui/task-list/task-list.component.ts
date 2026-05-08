@@ -68,7 +68,7 @@ import {
   ],
 })
 export class TaskListComponent implements OnDestroy {
-  private _lastTasksString = '';
+  private _lastTasksString: string | null = null;
   private pendingFocusIndex: number | null = null;
 
   @Input() set tasksString(value: string) {
