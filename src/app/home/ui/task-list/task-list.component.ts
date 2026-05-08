@@ -202,7 +202,9 @@ export class TaskListComponent implements OnDestroy {
     // Filter out private tasks when copying (handle graceful upgrade)
     const publicTasks = this.tasks.filter((t) => !(t.private ?? false));
     const combined = publicTasks
-      .map((t) => `${t.status}  ${t.text}`)
+      .map((t) =>
+        t.sectionTitle === true ? `🏷️  Section: ${t.text}` : `${t.status}  ${t.text}`
+      )
       .join('\n');
     if (navigator.clipboard) {
       navigator.clipboard
