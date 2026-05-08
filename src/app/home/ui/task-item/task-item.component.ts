@@ -5,12 +5,15 @@ import {
   IonButton,
   IonCol,
   IonGrid,
+  IonIcon,
   IonInput,
   IonItem,
   IonRow,
   IonSegment,
   IonSegmentButton,
 } from '@ionic/angular/standalone';
+import { addIcons } from 'ionicons';
+import { textOutline } from 'ionicons/icons';
 
 @Component({
   selector: 'app-task-item',
@@ -23,6 +26,7 @@ import {
     CommonModule,
     FormsModule,
     IonGrid,
+    IonIcon,
     IonRow,
     IonItem,
     IonSegment,
@@ -48,7 +52,11 @@ export class TaskItemComponent implements OnInit {
   @Output() upArrow = new EventEmitter<void>();
   @Output() downArrow = new EventEmitter<void>();
 
-  constructor() {}
+  constructor() {
+    addIcons({
+      textOutline,
+    });
+  }
 
   ngOnInit() {}
 
