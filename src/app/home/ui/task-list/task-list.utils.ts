@@ -1,3 +1,6 @@
+const privateFlagMarker = '🔒';
+const sectionTitleFlagMarker = '🏷️';
+
 export interface Task {
   status: string;
   text: string;
@@ -25,9 +28,7 @@ export function parseTasksString(value: string): Task[] {
   }
 
   return value.split('\n').map((item) => {
-    const isPrivate = item.includes('🔒');
-    const isSectionTitle = item.includes('🏷️');
-    const cleanItem = item.replace('🔒', '').replace('🏷️', '').trim();
+    const { cleanItem, isPrivate, isSectionTitle } = extractTrailingFlags(item);
     const [status, ...textParts] = cleanItem.split(/\s+/);
     const taskStatus = status && status.trim() !== '' ? status : '❌';
 
@@ -43,9 +44,38 @@ export function parseTasksString(value: string): Task[] {
 export function stringifyTasks(tasks: Task[]): string {
   return ensureTaskListHasPlaceholder(tasks)
     .map((task) => {
-      const privateFlag = task.private ?? false ? '🔒' : '';
-      const sectionTitleFlag = task.sectionTitle ?? false ? '🏷️' : '';
+      const privateFlag = task.private ?? false ? privateFlagMarker : '';
+      const sectionTitleFlag =
+        task.sectionTitle ?? false ? sectionTitleFlagMarker : '';
       return `${task.status} ${task.text} ${sectionTitleFlag} ${privateFlag}`.trim();
     })
     .join('\n');
+}
+
+function extractTrailingFlags(item: string): {
+  cleanItem: string;
+  isPrivate: boolean;
+  isSectionTitle: boolean;
+} {
+  let cleanItem = item.trim();
+  let isPrivate = false;
+  let isSectionTitle = false;
+
+  while (true) {
+    if (cleanItem.endsWith(privateFlagMarker)) {
+      isPrivate = true;
+      cleanItem = cleanItem.slice(0, -privateFlagMarker.length).trim();
+      continue;
+    }
+
+    if (cleanItem.endsWith(sectionTitleFlagMarker)) {
+      isSectionTitle = true;
+      cleanItem = cleanItem.slice(0, -sectionTitleFlagMarker.length).trim();
+      continue;
+    }
+
+    break;
+  }
+
+  return { cleanItem, isPrivate, isSectionTitle };
 }
