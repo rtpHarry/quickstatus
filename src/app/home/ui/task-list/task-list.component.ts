@@ -1,5 +1,7 @@
 import { NgForOf } from '@angular/common';
 import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   EventEmitter,
   Input,
@@ -44,6 +46,7 @@ import {
 } from './task-list.utils';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-task-list',
   templateUrl: './task-list.component.html',
   styleUrls: ['./task-list.component.scss'],
@@ -95,7 +98,8 @@ export class TaskListComponent implements OnDestroy {
 
   constructor(
     private toastController: ToastController,
-    private alertController: AlertController
+    private alertController: AlertController,
+    private changeDetectorRef: ChangeDetectorRef
   ) {
     addIcons({
       addCircleOutline,
@@ -351,6 +355,8 @@ export class TaskListComponent implements OnDestroy {
   }
 
   private emitListChange() {
+    // Also refresh when called from a parent button or an alert callback.
+    this.changeDetectorRef.markForCheck();
     this.clearListChangeTimer();
     const combined = stringifyTasks(this.tasks);
     // Update the cached value so we don't re-parse when parent passes it back

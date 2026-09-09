@@ -1,5 +1,5 @@
 import { NgFor, NgIf } from '@angular/common';
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, ViewChild } from '@angular/core';
 import {
   AlertController,
   IonButton,
@@ -53,6 +53,7 @@ interface DeletedTaskEntry {
 }
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-home',
   templateUrl: 'home.page.html',
   styleUrls: ['home.page.scss'],
@@ -98,7 +99,10 @@ export class HomePage implements OnInit {
   private readonly legacyStorageKey = 'taskList';
   private readonly projectKeyPrefix = 'taskList:';
 
-  constructor(private alertController: AlertController) {
+  constructor(
+    private alertController: AlertController,
+    private changeDetectorRef: ChangeDetectorRef
+  ) {
     addIcons({
       addCircleOutline,
       archiveOutline,
@@ -541,6 +545,7 @@ export class HomePage implements OnInit {
   }
 
   private persistProjects() {
+    this.changeDetectorRef.markForCheck();
     localStorage.setItem(
       this.projectsStorageKey,
       JSON.stringify(this.projects)
@@ -561,6 +566,7 @@ export class HomePage implements OnInit {
   }
 
   private persistTaskString(projectId: string, taskString: string) {
+    this.changeDetectorRef.markForCheck();
     this.currentTasksString = taskString;
     localStorage.setItem(this.buildProjectKey(projectId), taskString);
   }

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, ViewChild } from '@angular/core';
 import {
   IonButton,
   IonButtons,
@@ -17,6 +17,7 @@ import { addIcons } from 'ionicons';
 import { helpCircleOutline } from 'ionicons/icons';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-keyboard-shortcuts',
   templateUrl: './keyboard-shortcuts.component.html',
   styleUrls: ['./keyboard-shortcuts.component.scss'],
