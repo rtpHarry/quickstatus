@@ -1,3 +1,39 @@
+.status-buttons {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--ion-color-light);
+
+  button {
+    min-width: 70px;
+    min-height: 28px;
+    padding: 4px 13px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ion-text-color);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+
+    &[aria-pressed='true'] {
+      background: var(--ion-background-color, #fff);
+      border-color: var(--ion-color-medium);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ion-color-primary);
+      outline-offset: 1px;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+}
+
 .task-row.private-row {
   --background: var(--app-private-row-background);
   --inner-border-width: 0;

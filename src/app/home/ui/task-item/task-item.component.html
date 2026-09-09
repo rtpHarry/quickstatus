@@ -7,15 +7,29 @@
   <ion-grid>
     <ion-row class="ion-align-items-center">
       <ion-col size="auto">
-        <ion-segment
-          [(ngModel)]="task.status"
-          (ionChange)="emitChange()"
-          [disabled]="task.sectionHeading === true"
-        >
-          <ion-segment-button value="✅">✅</ion-segment-button>
-          <ion-segment-button value="☑️">☑️</ion-segment-button>
-          <ion-segment-button value="❌">❌</ion-segment-button>
-        </ion-segment>
+        <div class="status-buttons" role="group" aria-label="Task status">
+          <button
+            type="button"
+            [attr.aria-pressed]="task.status === '✅'"
+            [disabled]="task.sectionHeading === true"
+            (click)="selectStatus('✅')"
+            aria-label="Status: green check"
+          >✅</button>
+          <button
+            type="button"
+            [attr.aria-pressed]="task.status === '☑️'"
+            [disabled]="task.sectionHeading === true"
+            (click)="selectStatus('☑️')"
+            aria-label="Status: checked box"
+          >☑️</button>
+          <button
+            type="button"
+            [attr.aria-pressed]="task.status === '❌'"
+            [disabled]="task.sectionHeading === true"
+            (click)="selectStatus('❌')"
+            aria-label="Status: cross"
+          >❌</button>
+        </div>
       </ion-col>
       <ion-col>
         <ion-input

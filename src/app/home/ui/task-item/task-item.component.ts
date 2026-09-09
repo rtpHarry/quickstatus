@@ -9,8 +9,6 @@ import {
   IonInput,
   IonItem,
   IonRow,
-  IonSegment,
-  IonSegmentButton,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { lockClosedOutline, lockOpenOutline, textOutline } from 'ionicons/icons';
@@ -30,8 +28,6 @@ import { lockClosedOutline, lockOpenOutline, textOutline } from 'ionicons/icons'
     IonIcon,
     IonRow,
     IonItem,
-    IonSegment,
-    IonSegmentButton,
     IonInput,
   ],
 })
@@ -68,6 +64,14 @@ export class TaskItemComponent implements OnInit {
   }
 
   onInputChange() {
+    this.emitChange();
+  }
+
+  selectStatus(status: string) {
+    if (this.task.sectionHeading || this.task.status === status) {
+      return;
+    }
+    this.task.status = status;
     this.emitChange();
   }
 
