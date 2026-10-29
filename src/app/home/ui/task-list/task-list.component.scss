@@ -2,6 +2,12 @@ ion-list {
   margin-bottom: 1em;
 }
 
+ion-reorder-group > ion-item {
+  // Ionic sums integer offsetHeight values; avoid cumulative rounding drift.
+  // https://github.com/ionic-team/ionic-framework/issues/31670
+  height: calc-size(auto, round(up, size, 1px));
+}
+
 .full-height-wrapper {
   height: 100%;
 }
