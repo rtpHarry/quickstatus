@@ -74,3 +74,18 @@
     opacity: 1;
   }
 }
+
+.task-actions {
+  display: flex;
+  align-items: center;
+}
+
+.task-age-badge {
+  padding: 3px 6px;
+  margin-right: 4px;
+  border-radius: 6px;
+  background: var(--ion-color-light);
+  color: var(--ion-text-color);
+  font-size: 11px;
+  line-height: 1;
+}

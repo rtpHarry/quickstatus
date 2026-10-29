@@ -46,7 +46,14 @@
           role="note"
         ></ion-input>
       </ion-col>
-      <ion-col size="auto">
+      <ion-col size="auto" class="task-actions">
+        @if (ageBadge; as badge) {
+          <span
+            class="task-age-badge"
+            [attr.title]="badge.label"
+            [attr.aria-label]="badge.label"
+          >{{ badge.text }}</span>
+        }
         <ion-button
           fill="solid"
           (click)="toggleSectionHeading()"

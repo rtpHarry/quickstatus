@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, Input, OnDestroy, OnInit, Output } from '@angular/core';
+import { Task, taskAgeInDays } from '../task-list/task-list.utils';
 import { FormsModule } from '@angular/forms';
 import {
   IonButton,
@@ -31,25 +32,33 @@ import { lockClosedOutline, lockOpenOutline, textOutline } from 'ionicons/icons'
     IonInput,
   ],
 })
-export class TaskItemComponent implements OnInit {
-  @Input() task!: {
-    status: string;
-    text: string;
-    private?: boolean;
-    sectionHeading?: boolean;
-  };
-  @Output() taskChange = new EventEmitter<{
-    status: string;
-    text: string;
-    private?: boolean;
-    sectionHeading?: boolean;
-  }>();
+export class TaskItemComponent implements OnInit, OnDestroy {
+  @Input() task!: Task;
+  @Output() taskChange = new EventEmitter<Task>();
+  private ageRefreshTimer?: ReturnType<typeof setInterval>;
+
+  get ageBadge(): { text: string; label: string } | null {
+    const days = taskAgeInDays(this.task.created);
+    if (days === null) {
+      return null;
+    }
+
+    if (days === 0) {
+      return { text: 'today', label: 'today' };
+    }
+
+    return {
+      text: String(days),
+      label: `${days} ${days === 1 ? 'day' : 'days'}`,
+    };
+  }
+
   @Output() enterKey = new EventEmitter<void>();
   @Output() deleteKey = new EventEmitter<void>();
   @Output() upArrow = new EventEmitter<void>();
   @Output() downArrow = new EventEmitter<void>();
 
-  constructor() {
+  constructor(private changeDetectorRef: ChangeDetectorRef) {
     addIcons({
       lockClosedOutline,
       lockOpenOutline,
@@ -57,7 +66,13 @@ export class TaskItemComponent implements OnInit {
     });
   }
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.ageRefreshTimer = setInterval(() => this.changeDetectorRef.markForCheck(), 60000);
+  }
+
+  ngOnDestroy() {
+    clearInterval(this.ageRefreshTimer);
+  }
 
   emitChange() {
     this.taskChange.emit(this.task);
