@@ -59,6 +59,58 @@ export function stringifyTasks(tasks: Task[]): string {
     .join('\n');
 }
 
+/** Keep the first valid occurrence of each ID, allocating above all supplied IDs. */
+export function normalizeTaskListIds(
+  lists: Record<string, string>,
+  nextTaskId: number
+): { changedLists: Record<string, string>; nextTaskId: number } {
+  if (!Number.isSafeInteger(nextTaskId) || nextTaskId < 1) {
+    throw new Error('Invalid task ID counter');
+  }
+  const parsed = Object.keys(lists).sort().map((projectId) => ({
+    projectId,
+    tasks: parseTasksString(lists[projectId]),
+    lines: lists[projectId].trim() ? lists[projectId].split('\n') : [''],
+  }));
+  for (const { tasks } of parsed) {
+    for (const task of tasks) {
+      if (task.id !== undefined) nextTaskId = Math.max(nextTaskId, task.id + 1);
+    }
+  }
+  if (!Number.isSafeInteger(nextTaskId)) throw new Error('Task ID counter exhausted');
+
+  const seen = new Set<number>();
+  const changedLists: Record<string, string> = Object.create(null);
+  for (const { projectId, tasks, lines } of parsed) {
+    let changed = false;
+    tasks.forEach((task, index) => {
+      if (task.id === undefined || seen.has(task.id)) {
+        if (!Number.isSafeInteger(nextTaskId + 1)) throw new Error('Task ID counter exhausted');
+        task.id = nextTaskId++;
+        lines[index] = lists[projectId].trim() === ''
+          ? stringifyTasks([task]) : replaceTrailingTaskId(lines[index], task.id);
+        changed = true;
+      }
+      seen.add(task.id);
+    });
+    if (changed) changedLists[projectId] = lines.join('\n');
+  }
+  return { changedLists, nextTaskId };
+}
+
+/** Change identity metadata without reformatting the original task text/flags. */
+function replaceTrailingTaskId(line: string, id: number): string {
+  let remaining = line;
+  let suffix = '';
+  while (true) {
+    const flag = remaining.match(/(?:\s+\[id:[^\]\r\n]*\]|\s+\[created:\d{4}\/\d{2}\/\d{2}\]|\s*(?:🔒|🏷️))\s*$/);
+    if (!flag) break;
+    if (!flag[0].trim().startsWith('[id:')) suffix = flag[0] + suffix;
+    remaining = remaining.slice(0, -flag[0].length);
+  }
+  return remaining + suffix + ` [id:${id}]`;
+}
+
 function extractTrailingFlags(item: string): {
   cleanItem: string;
   isPrivate: boolean;
@@ -73,9 +125,10 @@ function extractTrailingFlags(item: string): {
   let id: number | undefined;
 
   while (true) {
-    const idFlag = cleanItem.match(/\s\[id:(\d+)\]$/);
-    if (idFlag && id === undefined && Number.isSafeInteger(Number(idFlag[1])) && Number(idFlag[1]) > 0) {
-      id = Number(idFlag[1]);
+    const idFlag = cleanItem.match(/\s\[id:([^\]\r\n]*)\]$/);
+    if (idFlag) {
+      const candidate = /^\d+$/.test(idFlag[1]) ? Number(idFlag[1]) : NaN;
+      if (id === undefined && Number.isSafeInteger(candidate) && candidate > 0) id = candidate;
       cleanItem = cleanItem.slice(0, -idFlag[0].length).trim();
       continue;
     }

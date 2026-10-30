@@ -33,9 +33,9 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
   it('imports once and keeps newer IndexedDB edits instead of replaying localStorage', async () => {
     localStorage.setItem('taskList:projects', JSON.stringify([{ id: 'one', name: 'One' }]));
     localStorage.setItem('taskList:one', '❌ legacy');
-    expect((await service.initialize()).tasks['one']).toBe('❌ legacy');
+    expect(parseTasksString((await service.initialize()).tasks['one'])[0]).toEqual(jasmine.objectContaining({ text: 'legacy', id: 1 }));
     await service.setProjectTasks('one', '✅ changed');
-    expect((await service.initialize()).tasks['one']).toBe('✅ changed');
+    expect(parseTasksString((await service.initialize()).tasks['one'])[0].text).toBe('changed');
     expect(localStorage.getItem('taskList:one')).toBe('❌ legacy');
   });
 
@@ -44,7 +44,7 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     localStorage.setItem('taskList:Work', '☑️ old format');
     const snapshot = await service.initialize();
     expect(snapshot.projects[0].name).toBe('Work');
-    expect(snapshot.tasks[snapshot.projects[0].id]).toBe('☑️ old format');
+    expect(parseTasksString(snapshot.tasks[snapshot.projects[0].id])[0].text).toBe('old format');
     expect(localStorage.getItem('taskList:Work')).toBe('☑️ old format');
   });
 
@@ -54,7 +54,7 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     await service.createProject({ id: 'archive', name: 'Archived project' });
     await service.deleteProject('archive');
     const backup = await service.exportBackup();
-    backup.tasks[id] = '✅ snapshot';
+    backup.tasks[id] = '✅ snapshot [id:1]';
     backup.metadata['nextTaskId'] = 42;
     backup.metadata['nextEventId'] = 2;
     backup.events = [{ id: 1, projectId: 'archive', localDate: '2026-10-30', type: 'test' }];
@@ -92,11 +92,13 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
       'taskList:old': '❌ backtick ` and ${literal} and \\ newline\n☑️ second' };
     const json = JSON.stringify(legacy, null, 2);
     await service.restoreBackupText(json);
-    expect((await service.exportSnapshot()).tasks['old']).toBe(legacy['taskList:old']);
+    expect(parseTasksString((await service.exportSnapshot()).tasks['old']).map(({ id, ...task }) => task))
+      .toEqual(parseTasksString(legacy['taskList:old']));
     const escaped = json.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
     await service.restoreBackupText('(() => { const backup = JSON.parse(`' + escaped
       + '`); throw new Error("must never execute"); })();');
-    expect((await service.exportSnapshot()).tasks['old']).toBe(legacy['taskList:old']);
+    expect(parseTasksString((await service.exportSnapshot()).tasks['old']).map(({ id, ...task }) => task))
+      .toEqual(parseTasksString(legacy['taskList:old']));
   });
 
   it('leaves a failed first migration retryable without modifying legacy data', async () => {
@@ -112,7 +114,7 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     expect(initialized).toBeUndefined();
     localStorage.setItem('taskList:projects', JSON.stringify([{ id: 'retry', name: 'Retry' }]));
     localStorage.setItem('taskList:retry', '❌ retained');
-    expect((await service.initialize()).tasks['retry']).toBe('❌ retained');
+    expect(parseTasksString((await service.initialize()).tasks['retry'])[0].text).toBe('retained');
   });
 
   it('[task IDs] reserves across connections without reusing deleted task IDs', async () => {
@@ -138,14 +140,35 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     }
   });
 
-  it('[task IDs] creates stable placeholders without backfilling legacy task rows', async () => {
+  it('[task IDs] creates stable placeholders and backfills legacy task rows', async () => {
     localStorage.setItem('taskList:projects', JSON.stringify([{ id: 'legacy', name: 'Legacy' }]));
     localStorage.setItem('taskList:legacy', '❌ existing without id');
-    expect((await service.initialize()).tasks['legacy']).toBe('❌ existing without id');
+    const legacyTask = parseTasksString((await service.initialize()).tasks['legacy'])[0];
+    expect(legacyTask.text).toBe('existing without id');
+    expect(legacyTask.id).toBeDefined();
     await service.createProject({ id: 'new', name: 'New' });
     const first = parseTasksString(await service.getProjectTasks('new'))[0].id;
     expect(first).toBeDefined();
     expect(parseTasksString((await service.initialize()).tasks['new'])[0].id).toBe(first);
+  });
+
+  it('[task ID backfill] normalizes startup and legacy restore atomically and idempotently', async () => {
+    const projects = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+    localStorage.setItem('taskList:projects', JSON.stringify(projects));
+    localStorage.setItem('taskList:a', '✅ preserved [id:20]\n❌ missing');
+    localStorage.setItem('taskList:b', '☑️ duplicate [id:20]\n❌ invalid [id:0]');
+    const first = await service.initialize();
+    expect(parseTasksString(first.tasks['a']).map((task) => task.id)).toEqual([20, 21]);
+    expect(parseTasksString(first.tasks['b']).map((task) => task.id)).toEqual([22, 23]);
+    const backup = await service.exportBackup();
+    expect(backup.metadata['nextTaskId']).toBe(24);
+    expect(await service.initialize()).toEqual(first);
+    expect(await service.exportBackup()).toEqual(backup);
+    await service.restoreSnapshot({ projects, tasks: {
+      a: '❌ restored [id:100]', b: '☑️ another [id:100]\n❌ missing',
+    } });
+    expect(parseTasksString(await service.getProjectTasks('b')).map((task) => task.id)).toEqual([101, 102]);
+    expect((await service.allocateTaskIds(1))[0]).toBe(103);
   });
 });
 

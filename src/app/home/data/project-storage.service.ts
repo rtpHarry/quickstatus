@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { createEmptyTask, stringifyTasks } from '../ui/task-list/task-list.utils';
+import { createEmptyTask, normalizeTaskListIds, stringifyTasks } from '../ui/task-list/task-list.utils';
 import { idbRequest, openProjectDatabase, projectStoreNames, transactionDone } from './project-storage.database';
 import { LegacyStorageBackup, Project, ProjectStorageBackup, ProjectStorageSnapshot, StoredProject } from './project-storage.types';
 
@@ -39,15 +39,7 @@ export class ProjectStorageService {
           const snapshot = this.fromLegacy(legacy, false);
           this.writeBackup(transaction, this.baselineBackup(snapshot));
         }
-        // Blank stored lists represent a new placeholder, not a legacy task backfill.
-        const lists = await idbRequest(transaction.objectStore('lists').getAll());
-        const emptyLists = lists.filter((row) => !row.tasks.trim());
-        if (emptyLists.length) {
-          const ids = await this.reserveTaskIds(transaction, emptyLists.length);
-          emptyLists.forEach((row, index) => transaction.objectStore('lists').put({
-            ...row, tasks: stringifyTasks([createEmptyTask(ids[index])]),
-          }));
-        }
+        await this.normalizeStoredTaskIds(transaction);
         await done;
       } catch (error) {
         try { transaction.abort(); } catch { /* It may already have aborted. */ }
@@ -77,6 +69,21 @@ export class ProjectStorageService {
     if (!this.isId(next) || !Number.isSafeInteger(next + count)) throw new Error('Task ID counter exhausted or invalid');
     metadata.put(next + count, 'nextTaskId');
     return Array.from({ length: count }, (_, index) => next + index);
+  }
+
+  /** Lists and the allocator are repaired together, without generating activity. */
+  private async normalizeStoredTaskIds(transaction: IDBTransaction): Promise<void> {
+    const lists = transaction.objectStore('lists');
+    const metadata = transaction.objectStore('metadata');
+    const [rows, next] = await Promise.all([
+      idbRequest(lists.getAll()),
+      idbRequest(metadata.get('nextTaskId')),
+    ]);
+    const normalized = normalizeTaskListIds(
+      this.recordFromEntries<string>(rows.map((row) => [row.projectId, row.tasks])), next
+    );
+    Object.entries(normalized.changedLists).forEach(([projectId, tasks]) => lists.put({ projectId, tasks }));
+    if (normalized.nextTaskId !== next) metadata.put(normalized.nextTaskId, 'nextTaskId');
   }
 
   getProjectTasks(projectId: string): Promise<string> {
@@ -185,7 +192,10 @@ export class ProjectStorageService {
     } catch (error) {
       return Promise.reject(error);
     }
-    return this.write([...projectStoreNames], (transaction) => this.writeBackup(transaction, copy));
+    return this.write([...projectStoreNames], async (transaction) => {
+      this.writeBackup(transaction, copy);
+      await this.normalizeStoredTaskIds(transaction);
+    });
   }
 
   private write<T>(stores: string[], operation: (transaction: IDBTransaction) => T | Promise<T>): Promise<T> {
