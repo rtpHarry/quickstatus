@@ -45,6 +45,8 @@ import {
 
 import { ProjectStorageService } from './data/project-storage.service';
 import { Project } from './data/project-storage.types';
+import { TaskActivityDraft } from './analytics/task-activity.types';
+import { restoredTaskEvent, taskRemovalEvents } from './analytics/task-actions';
 
 interface DeletedTaskEntry {
   projectId: string;
@@ -166,7 +168,8 @@ export class HomePage implements OnInit {
   }
 
   handleTaskListChange(combinedList: string) {
-    void this.persistTaskString(this.selectedProjectId, combinedList);
+    this.currentTasksString = combinedList;
+    this.changeDetectorRef.markForCheck();
   }
 
   async handleTaskDeleteRequest(event: TaskDeleteEvent) {
@@ -183,9 +186,9 @@ export class HomePage implements OnInit {
         const [id] = await this.storage.allocateTaskIds(1);
         tasks.push(createEmptyTask(id));
       }
+      await this.persistTaskString(projectId, stringifyTasks(tasks), taskRemovalEvents([deletedTask], 'normal'));
       this.pushDeletedTask({ projectId, index: event.index, task: { ...deletedTask } });
       this.taskListComponent?.setPendingFocusIndex(event.nextFocusIndex);
-      await this.persistTaskString(projectId, stringifyTasks(tasks));
     });
   }
 
@@ -197,7 +200,7 @@ export class HomePage implements OnInit {
 
     await this.runStorageAction(async () => {
       await this.flushPendingTaskChanges();
-      const deletedEntry = history.pop();
+      const deletedEntry = history[history.length - 1];
       if (!deletedEntry) return;
       const tasks = parseTasksString(this.currentTasksString);
       const isPlaceholderOnly =
@@ -206,8 +209,11 @@ export class HomePage implements OnInit {
       const workingTasks = isPlaceholderOnly ? [] : [...tasks];
       const insertIndex = Math.min(Math.max(deletedEntry.index, 0), workingTasks.length);
       workingTasks.splice(insertIndex, 0, { ...deletedEntry.task });
+      const events = [...(isPlaceholderOnly ? taskRemovalEvents(tasks, 'undo') : []),
+        restoredTaskEvent(deletedEntry.task)];
+      await this.persistTaskString(projectId, stringifyTasks(workingTasks), events);
+      history.pop();
       this.taskListComponent?.setPendingFocusIndex(insertIndex);
-      await this.persistTaskString(projectId, stringifyTasks(workingTasks));
     });
   }
 
@@ -351,7 +357,9 @@ export class HomePage implements OnInit {
     if (!this.projects.some((project) => project.id === projectId)) return;
     await this.runStorageAction(async () => {
       await this.flushPendingTaskChanges();
-      await this.storage.deleteProject(projectId);
+      const tasks = parseTasksString(await this.storage.getProjectTasks(projectId));
+      await this.storage.commitTaskActivity({ projectId, tasks: null, archiveProject: true,
+        events: taskRemovalEvents(tasks, 'project-delete') });
       this.projects = this.projects.filter((project) => project.id !== projectId);
       delete this.deleteHistoryByProject[projectId];
       this.selectedProjectId = this.projects[0].id;
@@ -440,16 +448,11 @@ export class HomePage implements OnInit {
     return `${baseName} ${candidate}`;
   }
 
-  private async persistTaskString(projectId: string, taskString: string) {
-    if (!projectId) return;
+  private async persistTaskString(projectId: string, taskString: string, events: TaskActivityDraft[]) {
+    await this.storage.commitTaskActivity({ projectId, tasks: taskString, events });
     if (projectId === this.selectedProjectId) {
       this.currentTasksString = taskString;
       this.changeDetectorRef.markForCheck();
-    }
-    try {
-      await this.storage.setProjectTasks(projectId, taskString);
-    } catch (error) {
-      await this.showStorageError(error);
     }
   }
 

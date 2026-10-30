@@ -37,6 +37,8 @@ import {
   trashOutline,
 } from 'ionicons/icons';
 import { ProjectStorageService } from '../../data/project-storage.service';
+import { TaskActivityDraft, TaskActivitySource } from '../../analytics/task-activity.types';
+import { pastedTaskEvents, taskChangeEvents, taskRemovalEvents } from '../../analytics/task-actions';
 import { TaskItemComponent } from '../task-item/task-item.component';
 import {
   createEmptyTask,
@@ -83,10 +85,12 @@ export class TaskListComponent implements OnDestroy {
     }
     this._lastTasksString = value;
     this.listVersion++;
+    this.saveError = undefined;
     this.clearListChangeTimer();
     this.tasks = parseTasksString(value);
     this.focusPendingInput();
   }
+  @Input() projectId = '';
   @Output() listChange = new EventEmitter<string>();
   @Output() deleteTaskRequest = new EventEmitter<TaskDeleteEvent>();
 
@@ -96,6 +100,8 @@ export class TaskListComponent implements OnDestroy {
   private readonly listChangeDebounceMs = 750;
   private pendingRows: Promise<void> = Promise.resolve();
   private listVersion = 0;
+  private pendingSave: Promise<void> = Promise.resolve();
+  private saveError: unknown;
 
   @ViewChild(IonModal) modal!: IonModal;
   @ViewChild('pasteTextarea') pasteTextarea!: IonTextarea;
@@ -172,8 +178,10 @@ export class TaskListComponent implements OnDestroy {
   }
 
   onTaskChange(updatedTask: Task, index: number) {
+    const events = taskChangeEvents(this.tasks[index], updatedTask);
     this.tasks[index] = updatedTask;
-    this.scheduleListChangeEmit();
+    if (events.length > 0) this.emitListChange(events);
+    else this.scheduleListChangeEmit();
   }
 
   requestDeleteTask(index: number) {
@@ -269,7 +277,7 @@ export class TaskListComponent implements OnDestroy {
           handler: () => {
             void this.queueRowCreation(([id]) => {
               this.tasks = [createEmptyTask(id)];
-            });
+            }, 1, 'reset');
           },
         },
       ],
@@ -287,7 +295,7 @@ export class TaskListComponent implements OnDestroy {
     const tasks = parseTasksString(this.pastedContent);
     const applied = await this.queueRowCreation((ids) => {
       this.tasks = tasks.map((task, index) => ({ ...task, id: ids[index] }));
-    }, tasks.length);
+    }, tasks.length, 'paste');
     if (applied) {
       this.pastedContent = '';
       await this.modal.dismiss();
@@ -308,13 +316,22 @@ export class TaskListComponent implements OnDestroy {
     }, 150);
   }
 
-  private emitListChange() {
+  private emitListChange(events: TaskActivityDraft[] = []) {
     // Also refresh when called from a parent button or an alert callback.
     this.changeDetectorRef.markForCheck();
     this.clearListChangeTimer();
     const combined = stringifyTasks(this.tasks);
     // Update the cached value so we don't re-parse when parent passes it back
     this._lastTasksString = combined;
+    const projectId = this.projectId;
+    // Submit synchronously so queued storage reads/backups wait for this save.
+    this.pendingSave = this.storage.commitTaskActivity({ projectId, tasks: combined, events })
+      .then(() => undefined);
+    void this.pendingSave.catch(async (error) => {
+      this.saveError = error;
+      console.error('Failed to save task activity:', error);
+      await this.showToast('Unable to save task changes');
+    });
     this.listChange.emit(combined);
   }
 
@@ -339,15 +356,20 @@ export class TaskListComponent implements OnDestroy {
       this.clearListChangeTimer();
       this.emitListChange();
     }
+    await this.pendingSave;
+    if (this.saveError) throw this.saveError;
   }
 
-  private queueRowCreation(apply: (ids: number[]) => void, count = 1): Promise<boolean> {
+  private queueRowCreation(apply: (ids: number[]) => void, count = 1, source?: TaskActivitySource): Promise<boolean> {
     const version = this.listVersion;
     const result = this.pendingRows.then(async () => {
       const ids = await this.storage.allocateTaskIds(count);
       if (version !== this.listVersion) return false;
+      const removed = source ? taskRemovalEvents(this.tasks, source) : [];
       apply(ids);
-      this.emitListChange();
+      const entered = source === 'paste' ? pastedTaskEvents(this.tasks) : [];
+      this.emitListChange([...removed, ...entered]);
+      await this.pendingSave;
       return true;
     }).catch(async (error) => {
       console.error('Failed to allocate task IDs:', error);

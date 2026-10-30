@@ -74,31 +74,29 @@ export class TaskItemComponent implements OnInit, OnDestroy {
     clearInterval(this.ageRefreshTimer);
   }
 
-  emitChange() {
+  private updateTask(change: Partial<Task>) {
+    this.task = { ...this.task, ...change };
     this.taskChange.emit(this.task);
   }
 
-  onInputChange() {
-    this.emitChange();
+  onTextChange(text: string) {
+    this.updateTask({ text });
   }
 
   selectStatus(status: string) {
     if (this.task.sectionHeading || this.task.status === status) {
       return;
     }
-    this.task.status = status;
-    this.emitChange();
+    this.updateTask({ status });
   }
 
   togglePrivate() {
     // Handle graceful upgrade for existing data without private field
-    this.task.private = !(this.task.private ?? false);
-    this.emitChange();
+    this.updateTask({ private: !(this.task.private ?? false) });
   }
 
   toggleSectionHeading() {
-    this.task.sectionHeading = !(this.task.sectionHeading ?? false);
-    this.emitChange();
+    this.updateTask({ sectionHeading: !(this.task.sectionHeading ?? false) });
   }
 
   emitEnterKey() {

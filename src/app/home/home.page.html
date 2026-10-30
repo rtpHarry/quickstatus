@@ -49,6 +49,7 @@
     <app-task-list
       #taskList
       [tasksString]="currentTasksString"
+      [projectId]="selectedProjectId"
       (listChange)="handleTaskListChange($event)"
       (deleteTaskRequest)="handleTaskDeleteRequest($event)"
     ></app-task-list>

@@ -35,8 +35,8 @@
         <ion-input
           [class.section-heading-input]="task.sectionHeading === true"
           style="width: 100%"
-          [(ngModel)]="task.text"
-          (ionInput)="emitChange()"
+          [ngModel]="task.text"
+          (ngModelChange)="onTextChange($event)"
           (keydown.enter)="emitEnterKey()"
           (keydown)="handleKeydown($event)"
           placeholder="Enter task"
