@@ -38,9 +38,9 @@ import {
   refreshOutline,
   trashOutline,
 } from 'ionicons/icons';
-import { ProjectStorageService } from '../../data/project-storage.service';
-import { TaskActivityDraft, TaskActivitySource } from '../../analytics/task-activity.types';
 import { pastedTaskEvents, taskChangeEvents, taskRemovalEvents } from '../../analytics/task-actions';
+import { TaskActivityDraft, TaskActivitySource } from '../../analytics/task-activity.types';
+import { ProjectStorageService } from '../../data/project-storage.service';
 import { TaskItemComponent } from '../task-item/task-item.component';
 import {
   createEmptyTask,
@@ -235,7 +235,7 @@ export class TaskListComponent implements OnDestroy {
     await this.flushPendingChanges();
     try {
       const backup = await this.storage.exportBackupText();
-      this.copyTextToClipboard(backup, 'Backup copied. Use Export → Import Backup to restore it.');
+      this.copyTextToClipboard(backup, 'Backup copied to clipboard. Use Export → Import Backup to restore it.');
     } catch (error) {
       console.error('Failed to export backup:', error);
       await this.showToast('Unable to export backup');
