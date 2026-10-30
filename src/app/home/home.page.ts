@@ -25,10 +25,7 @@ import { addIcons } from 'ionicons';
 import {
   addCircleOutline,
   addOutline,
-  archiveOutline,
   arrowUndoOutline,
-  clipboardOutline,
-  copyOutline,
   createOutline,
   refreshOutline,
   reorderThreeOutline,
@@ -36,6 +33,7 @@ import {
 import { KeyboardShortcutsComponent } from './ui/keyboard-shortcuts/keyboard-shortcuts.component';
 import { TaskListComponent } from './ui/task-list/task-list.component';
 import { ProjectStatsBarComponent } from './ui/project-stats-bar/project-stats-bar.component';
+import { ExportAction, ExportMenuComponent } from './ui/export-menu/export-menu.component';
 import {
   createEmptyTask,
   parseTasksString,
@@ -86,6 +84,7 @@ interface DeletedTaskEntry {
     IonReorderGroup,
     TaskListComponent,
     ProjectStatsBarComponent,
+    ExportMenuComponent,
     KeyboardShortcutsComponent,
   ],
 })
@@ -116,10 +115,7 @@ export class HomePage implements OnInit {
   ) {
     addIcons({
       addCircleOutline,
-      archiveOutline,
       arrowUndoOutline,
-      copyOutline,
-      clipboardOutline,
       refreshOutline,
       addOutline,
       createOutline,
@@ -143,6 +139,36 @@ export class HomePage implements OnInit {
     this.restoreContent = '';
     this.restoreError = '';
     await this.restoreModal?.present();
+  }
+
+  async handleExportAction(action: ExportAction): Promise<void> {
+    if (this.storageBusy) {
+      return;
+    }
+
+    if (action === 'import') {
+      await this.openRestoreBackup();
+      return;
+    }
+
+    if (!this.selectedProjectId || !this.taskListComponent) {
+      return;
+    }
+
+    switch (action) {
+      case 'export':
+        await this.taskListComponent.copyBackupToClipboard();
+        break;
+      case 'copy':
+        await this.taskListComponent.copyTasksToClipboard();
+        break;
+      case 'copy-private':
+        await this.taskListComponent.copyTasksToClipboard(true);
+        break;
+      case 'paste':
+        await this.taskListComponent.openPaste();
+        break;
+    }
   }
 
   async cancelRestoreBackup() {

@@ -213,10 +213,10 @@ export class TaskListComponent implements OnDestroy {
     });
   }
 
-  async copyTasksToClipboard() {
-    // Filter out private tasks when copying (handle graceful upgrade)
-    const publicTasks = this.tasks.filter((t) => !(t.private ?? false));
-    const combined = publicTasks
+  async copyTasksToClipboard(includePrivate = false) {
+    await this.flushPendingChanges();
+    const copiedTasks = this.tasks.filter((task) => includePrivate || !task.private);
+    const combined = copiedTasks
       .map((t) =>
         t.sectionHeading === true
           ? `🏷️  Section: ${t.text}`
@@ -225,7 +225,9 @@ export class TaskListComponent implements OnDestroy {
       .join('\n');
     this.copyTextToClipboard(
       combined,
-      'List copied to clipboard (private items excluded)'
+      includePrivate
+        ? 'List copied to clipboard (private items included)'
+        : 'List copied to clipboard (private items excluded)'
     );
   }
 
@@ -233,7 +235,7 @@ export class TaskListComponent implements OnDestroy {
     await this.flushPendingChanges();
     try {
       const backup = await this.storage.exportBackupText();
-      this.copyTextToClipboard(backup, 'Backup copied. Use Restore Backup to restore it.');
+      this.copyTextToClipboard(backup, 'Backup copied. Use Export → Import Backup to restore it.');
     } catch (error) {
       console.error('Failed to export backup:', error);
       await this.showToast('Unable to export backup');
@@ -292,6 +294,12 @@ export class TaskListComponent implements OnDestroy {
     });
 
     await alert.present();
+  }
+
+  async openPaste(): Promise<void> {
+    await this.flushPendingChanges();
+    this.pastedContent = '';
+    await this.modal.present();
   }
 
   cancelPaste() {

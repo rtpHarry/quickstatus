@@ -1,0 +1,10 @@
+<ion-button (click)="open()" [disabled]="busy" aria-haspopup="dialog">
+  <ion-icon slot="start" name="share-outline"></ion-icon>
+  Export
+</ion-button>
+<ion-action-sheet
+  header="Import, export and copy"
+  [isOpen]="isOpen"
+  [buttons]="buttons"
+  (didDismiss)="onDismiss($event)"
+></ion-action-sheet>
