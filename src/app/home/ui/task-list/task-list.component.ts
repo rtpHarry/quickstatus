@@ -82,6 +82,7 @@ export class TaskListComponent implements OnDestroy {
       return;
     }
     this._lastTasksString = value;
+    this.listVersion++;
     this.clearListChangeTimer();
     this.tasks = parseTasksString(value);
     this.focusPendingInput();
@@ -93,6 +94,8 @@ export class TaskListComponent implements OnDestroy {
   pastedContent = '';
   private listChangeTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly listChangeDebounceMs = 750;
+  private pendingRows: Promise<void> = Promise.resolve();
+  private listVersion = 0;
 
   @ViewChild(IonModal) modal!: IonModal;
   @ViewChild('pasteTextarea') pasteTextarea!: IonTextarea;
@@ -116,27 +119,17 @@ export class TaskListComponent implements OnDestroy {
     this.clearListChangeTimer();
   }
 
-  addTask(index?: number) {
-    const newTask = createEmptyTask();
-    if (index !== undefined) {
-      this.tasks.splice(index + 1, 0, newTask);
+  async addTask(index?: number) {
+    await this.queueRowCreation(([id]) => {
+      const insertIndex = index !== undefined ? index + 1 : this.tasks.length;
+      this.tasks.splice(insertIndex, 0, createEmptyTask(id));
       setTimeout(() => {
-        const input = document.querySelectorAll('ion-input')[index + 1];
+        const input = document.querySelectorAll('ion-input')[insertIndex];
         if (input) {
           input.setFocus();
         }
       });
-    } else {
-      this.tasks.push(newTask);
-      setTimeout(() => {
-        const input =
-          document.querySelectorAll('ion-input')[this.tasks.length - 1];
-        if (input) {
-          input.setFocus();
-        }
-      });
-    }
-    this.emitListChange();
+    });
   }
 
   handleEnterKey(index: number) {
@@ -221,7 +214,7 @@ export class TaskListComponent implements OnDestroy {
   }
 
   async copyBackupToClipboard() {
-    this.flushPendingChanges();
+    await this.flushPendingChanges();
     try {
       const backup = await this.storage.exportBackupText();
       this.copyTextToClipboard(backup, 'Backup copied. Use Restore Backup to restore it.');
@@ -274,8 +267,9 @@ export class TaskListComponent implements OnDestroy {
         {
           text: 'Yes',
           handler: () => {
-            this.tasks = [createEmptyTask()];
-            this.emitListChange();
+            void this.queueRowCreation(([id]) => {
+              this.tasks = [createEmptyTask(id)];
+            });
           },
         },
       ],
@@ -289,14 +283,15 @@ export class TaskListComponent implements OnDestroy {
     this.modal.dismiss(null, 'cancel');
   }
 
-  confirmPaste() {
-    try {
-      this.tasks = parseTasksString(this.pastedContent);
-    } catch (e) {
-      console.error('Failed to parse tasks:', e);
+  async confirmPaste() {
+    const tasks = parseTasksString(this.pastedContent);
+    const applied = await this.queueRowCreation((ids) => {
+      this.tasks = tasks.map((task, index) => ({ ...task, id: ids[index] }));
+    }, tasks.length);
+    if (applied) {
+      this.pastedContent = '';
+      await this.modal.dismiss();
     }
-    this.pastedContent = '';
-    this.modal.dismiss();
   }
 
   onWillDismiss(event: CustomEvent<OverlayEventDetail>) {
@@ -338,11 +333,29 @@ export class TaskListComponent implements OnDestroy {
     }
   }
 
-  public flushPendingChanges(): void {
+  public async flushPendingChanges(): Promise<void> {
+    await this.pendingRows;
     if (this.listChangeTimer) {
       this.clearListChangeTimer();
       this.emitListChange();
     }
+  }
+
+  private queueRowCreation(apply: (ids: number[]) => void, count = 1): Promise<boolean> {
+    const version = this.listVersion;
+    const result = this.pendingRows.then(async () => {
+      const ids = await this.storage.allocateTaskIds(count);
+      if (version !== this.listVersion) return false;
+      apply(ids);
+      this.emitListChange();
+      return true;
+    }).catch(async (error) => {
+      console.error('Failed to allocate task IDs:', error);
+      await this.showToast('Unable to create task rows');
+      return false;
+    });
+    this.pendingRows = result.then(() => undefined);
+    return result;
   }
 
   public setPendingFocusIndex(index: number): void {

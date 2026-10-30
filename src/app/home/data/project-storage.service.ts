@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { createEmptyTask, stringifyTasks } from '../ui/task-list/task-list.utils';
 import { idbRequest, openProjectDatabase, projectStoreNames, transactionDone } from './project-storage.database';
 import { LegacyStorageBackup, Project, ProjectStorageBackup, ProjectStorageSnapshot, StoredProject } from './project-storage.types';
 
@@ -38,6 +39,15 @@ export class ProjectStorageService {
           const snapshot = this.fromLegacy(legacy, false);
           this.writeBackup(transaction, this.baselineBackup(snapshot));
         }
+        // Blank stored lists represent a new placeholder, not a legacy task backfill.
+        const lists = await idbRequest(transaction.objectStore('lists').getAll());
+        const emptyLists = lists.filter((row) => !row.tasks.trim());
+        if (emptyLists.length) {
+          const ids = await this.reserveTaskIds(transaction, emptyLists.length);
+          emptyLists.forEach((row, index) => transaction.objectStore('lists').put({
+            ...row, tasks: stringifyTasks([createEmptyTask(ids[index])]),
+          }));
+        }
         await done;
       } catch (error) {
         try { transaction.abort(); } catch { /* It may already have aborted. */ }
@@ -53,6 +63,20 @@ export class ProjectStorageService {
       const random = (Math.random() * 16) | 0;
       return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
     });
+  }
+
+  /** Reservations commit before returning; gaps are intentional after cancelled actions. */
+  allocateTaskIds(count: number): Promise<number[]> {
+    return this.write(['metadata'], (transaction) => this.reserveTaskIds(transaction, count));
+  }
+
+  private async reserveTaskIds(transaction: IDBTransaction, count: number): Promise<number[]> {
+    if (!Number.isSafeInteger(count) || count < 1) throw new Error('Invalid task ID reservation');
+    const metadata = transaction.objectStore('metadata');
+    const next = await idbRequest(metadata.get('nextTaskId'));
+    if (!this.isId(next) || !Number.isSafeInteger(next + count)) throw new Error('Task ID counter exhausted or invalid');
+    metadata.put(next + count, 'nextTaskId');
+    return Array.from({ length: count }, (_, index) => next + index);
   }
 
   getProjectTasks(projectId: string): Promise<string> {
@@ -81,11 +105,12 @@ export class ProjectStorageService {
 
   createProject(project: Project): Promise<void> {
     const copy = { ...project };
-    return this.write(['projects', 'lists'], async (transaction) => {
+    return this.write(['projects', 'lists', 'metadata'], async (transaction) => {
       const store = transaction.objectStore('projects');
       const position = await idbRequest(store.count());
+      const [id] = await this.reserveTaskIds(transaction, 1);
       store.add({ ...copy, position });
-      transaction.objectStore('lists').add({ projectId: copy.id, tasks: '' });
+      transaction.objectStore('lists').add({ projectId: copy.id, tasks: stringifyTasks([createEmptyTask(id)]) });
     });
   }
 
@@ -163,14 +188,15 @@ export class ProjectStorageService {
     return this.write([...projectStoreNames], (transaction) => this.writeBackup(transaction, copy));
   }
 
-  private write(stores: string[], operation: (transaction: IDBTransaction) => void | Promise<void>): Promise<void> {
+  private write<T>(stores: string[], operation: (transaction: IDBTransaction) => T | Promise<T>): Promise<T> {
     return this.enqueue(async () => {
       const db = await this.getDatabase();
       const transaction = db.transaction(stores, 'readwrite');
       const done = transactionDone(transaction);
       try {
-        await operation(transaction);
+        const result = await operation(transaction);
         await done;
+        return result;
       } catch (error) {
         try { transaction.abort(); } catch { /* It may already have aborted. */ }
         await done.catch(() => undefined);

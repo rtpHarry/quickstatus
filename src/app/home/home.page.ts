@@ -36,7 +36,7 @@ import {
 import { KeyboardShortcutsComponent } from './ui/keyboard-shortcuts/keyboard-shortcuts.component';
 import { TaskListComponent } from './ui/task-list/task-list.component';
 import {
-  ensureTaskListHasPlaceholder,
+  createEmptyTask,
   parseTasksString,
   stringifyTasks,
   Task,
@@ -143,11 +143,11 @@ export class HomePage implements OnInit {
 
   async confirmRestoreBackup() {
     if (this.storageBusy || !this.restoreContent.trim()) return;
-    this.flushPendingTaskChanges();
     this.storageBusy = true;
     this.restoreError = '';
     this.changeDetectorRef.markForCheck();
     try {
+      await this.flushPendingTaskChanges();
       await this.storage.restoreBackupText(this.restoreContent);
       const snapshot = await this.storage.initialize();
       this.projects = snapshot.projects;
@@ -169,65 +169,46 @@ export class HomePage implements OnInit {
     void this.persistTaskString(this.selectedProjectId, combinedList);
   }
 
-  handleTaskDeleteRequest(event: TaskDeleteEvent) {
-    if (!this.selectedProjectId) {
-      return;
-    }
+  async handleTaskDeleteRequest(event: TaskDeleteEvent) {
+    if (!this.selectedProjectId || this.storageBusy) return;
+    const projectId = this.selectedProjectId;
+    await this.runStorageAction(async () => {
+      await this.flushPendingTaskChanges();
+      const tasks = parseTasksString(this.currentTasksString);
+      const deletedTask = tasks[event.index] ?? event.task;
+      if (!deletedTask) return;
 
-    this.flushPendingTaskChanges();
-
-    const tasks = parseTasksString(this.currentTasksString);
-    const deletedTask = tasks[event.index] ?? event.task;
-    if (!deletedTask) {
-      return;
-    }
-
-    tasks.splice(event.index, 1);
-    this.pushDeletedTask({
-      projectId: this.selectedProjectId,
-      index: event.index,
-      task: { ...deletedTask },
+      tasks.splice(event.index, 1);
+      if (tasks.length === 0) {
+        const [id] = await this.storage.allocateTaskIds(1);
+        tasks.push(createEmptyTask(id));
+      }
+      this.pushDeletedTask({ projectId, index: event.index, task: { ...deletedTask } });
+      this.taskListComponent?.setPendingFocusIndex(event.nextFocusIndex);
+      await this.persistTaskString(projectId, stringifyTasks(tasks));
     });
-
-    this.taskListComponent?.setPendingFocusIndex(event.nextFocusIndex);
-    void this.persistTaskString(
-      this.selectedProjectId,
-      stringifyTasks(ensureTaskListHasPlaceholder(tasks))
-    );
   }
 
-  undoDelete() {
-    const history = this.deleteHistoryByProject[this.selectedProjectId];
-    if (!history || history.length === 0) {
-      return;
-    }
+  async undoDelete() {
+    if (this.storageBusy) return;
+    const projectId = this.selectedProjectId;
+    const history = this.deleteHistoryByProject[projectId];
+    if (!history?.length) return;
 
-    this.flushPendingTaskChanges();
-
-    const deletedEntry = history.pop();
-    if (!deletedEntry) {
-      return;
-    }
-
-    const tasks = parseTasksString(this.currentTasksString);
-    const isPlaceholderOnly =
-      tasks.length === 1 &&
-      tasks[0].text === '' &&
-      tasks[0].status === '❌' &&
-      !(tasks[0].private ?? false);
-    const workingTasks = isPlaceholderOnly ? [] : [...tasks];
-    const insertIndex = Math.min(
-      Math.max(deletedEntry.index, 0),
-      workingTasks.length
-    );
-
-    workingTasks.splice(insertIndex, 0, { ...deletedEntry.task });
-
-    this.taskListComponent?.setPendingFocusIndex(insertIndex);
-    void this.persistTaskString(
-      this.selectedProjectId,
-      stringifyTasks(workingTasks)
-    );
+    await this.runStorageAction(async () => {
+      await this.flushPendingTaskChanges();
+      const deletedEntry = history.pop();
+      if (!deletedEntry) return;
+      const tasks = parseTasksString(this.currentTasksString);
+      const isPlaceholderOnly =
+        tasks.length === 1 && tasks[0].text === '' && tasks[0].status === '❌' &&
+        !(tasks[0].private ?? false) && !(tasks[0].sectionHeading ?? false);
+      const workingTasks = isPlaceholderOnly ? [] : [...tasks];
+      const insertIndex = Math.min(Math.max(deletedEntry.index, 0), workingTasks.length);
+      workingTasks.splice(insertIndex, 0, { ...deletedEntry.task });
+      this.taskListComponent?.setPendingFocusIndex(insertIndex);
+      await this.persistTaskString(projectId, stringifyTasks(workingTasks));
+    });
   }
 
   hasUndoHistoryForActiveProject(): boolean {
@@ -368,8 +349,8 @@ export class HomePage implements OnInit {
 
   private async deleteProject(projectId: string) {
     if (!this.projects.some((project) => project.id === projectId)) return;
-    this.flushPendingTaskChanges();
     await this.runStorageAction(async () => {
+      await this.flushPendingTaskChanges();
       await this.storage.deleteProject(projectId);
       this.projects = this.projects.filter((project) => project.id !== projectId);
       delete this.deleteHistoryByProject[projectId];
@@ -412,8 +393,8 @@ export class HomePage implements OnInit {
 
   private async switchProject(projectId: string) {
     if (this.storageBusy) return;
-    this.flushPendingTaskChanges();
     await this.runStorageAction(async () => {
+      await this.flushPendingTaskChanges();
       const tasks = await this.storage.getProjectTasks(projectId);
       this.selectedProjectId = projectId;
       this.currentTasksString = tasks;
@@ -422,17 +403,17 @@ export class HomePage implements OnInit {
 
   private async addProject() {
     if (this.storageBusy) return;
-    this.flushPendingTaskChanges();
     const project: Project = {
       id: this.storage.newProjectId(),
       name: this.generateNextProjectName(),
     };
     await this.runStorageAction(async () => {
+      await this.flushPendingTaskChanges();
       await this.storage.createProject(project);
       this.projects = [...this.projects, project];
       this.deleteHistoryByProject[project.id] = [];
       this.selectedProjectId = project.id;
-      this.currentTasksString = '';
+      this.currentTasksString = await this.storage.getProjectTasks(project.id);
       if (this.segment) this.segment.value = project.id;
     });
   }
@@ -500,7 +481,7 @@ export class HomePage implements OnInit {
     this.deleteHistoryByProject[entry.projectId].push(entry);
   }
 
-  private flushPendingTaskChanges() {
-    this.taskListComponent?.flushPendingChanges();
+  private async flushPendingTaskChanges(): Promise<void> {
+    await this.taskListComponent?.flushPendingChanges();
   }
 }

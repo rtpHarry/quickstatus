@@ -2,6 +2,7 @@ const privateFlagMarker = '🔒';
 const sectionHeadingFlagMarker = '🏷️';
 
 export interface Task {
+  id?: number;
   status: string;
   text: string;
   private?: boolean;
@@ -15,8 +16,8 @@ export interface TaskDeleteEvent {
   nextFocusIndex: number;
 }
 
-export function createEmptyTask(): Task {
-  return { status: '❌', text: '', private: false, sectionHeading: false, created: formatCreatedDate() };
+export function createEmptyTask(id?: number): Task {
+  return { ...(id !== undefined ? { id } : {}), status: '❌', text: '', private: false, sectionHeading: false, created: formatCreatedDate() };
 }
 
 export function ensureTaskListHasPlaceholder(tasks: Task[]): Task[] {
@@ -29,7 +30,7 @@ export function parseTasksString(value: string): Task[] {
   }
 
   return value.split('\n').map((item) => {
-    const { cleanItem, isPrivate, isSectionHeading, created } =
+    const { cleanItem, isPrivate, isSectionHeading, created, id } =
       extractTrailingFlags(item);
     const [status, ...textParts] = cleanItem.split(/\s+/);
     const taskStatus = status && status.trim() !== '' ? status : '❌';
@@ -40,6 +41,7 @@ export function parseTasksString(value: string): Task[] {
       private: isPrivate,
       sectionHeading: isSectionHeading,
       ...(created ? { created } : {}),
+      ...(id !== undefined ? { id } : {}),
     };
   });
 }
@@ -51,7 +53,8 @@ export function stringifyTasks(tasks: Task[]): string {
       const sectionHeadingFlag =
         task.sectionHeading ?? false ? sectionHeadingFlagMarker : '';
       const createdFlag = task.created ? ` [created:${task.created}]` : '';
-      return `${task.status} ${task.text} ${sectionHeadingFlag} ${privateFlag}`.trim() + createdFlag;
+      const idFlag = task.id !== undefined ? ` [id:${task.id}]` : '';
+      return `${task.status} ${task.text} ${sectionHeadingFlag} ${privateFlag}`.trim() + createdFlag + idFlag;
     })
     .join('\n');
 }
@@ -61,13 +64,21 @@ function extractTrailingFlags(item: string): {
   isPrivate: boolean;
   isSectionHeading: boolean;
   created?: string;
+  id?: number;
 } {
   let cleanItem = item.trim();
   let isPrivate = false;
   let isSectionHeading = false;
   let created: string | undefined;
+  let id: number | undefined;
 
   while (true) {
+    const idFlag = cleanItem.match(/\s\[id:(\d+)\]$/);
+    if (idFlag && id === undefined && Number.isSafeInteger(Number(idFlag[1])) && Number(idFlag[1]) > 0) {
+      id = Number(idFlag[1]);
+      cleanItem = cleanItem.slice(0, -idFlag[0].length).trim();
+      continue;
+    }
     const dateFlag = cleanItem.match(/\s\[created:(\d{4}\/\d{2}\/\d{2})\]$/);
     if (dateFlag && created === undefined) {
       created = dateFlag[1];
@@ -90,7 +101,7 @@ function extractTrailingFlags(item: string): {
     break;
   }
 
-  return { cleanItem, isPrivate, isSectionHeading, created };
+  return { cleanItem, isPrivate, isSectionHeading, created, id };
 }
 
 export function formatCreatedDate(date = new Date()): string {

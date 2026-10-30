@@ -1,5 +1,6 @@
 import { openProjectDatabase, projectDatabaseName } from './project-storage.database';
 import { ProjectStorageService } from './project-storage.service';
+import { createEmptyTask, parseTasksString, stringifyTasks } from '../ui/task-list/task-list.utils';
 
 /** Real browser IndexedDB checks; no Angular fixture or application build needed. */
 describe('ProjectStorageService IndexedDB migration and restore', () => {
@@ -112,6 +113,39 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     localStorage.setItem('taskList:projects', JSON.stringify([{ id: 'retry', name: 'Retry' }]));
     localStorage.setItem('taskList:retry', '❌ retained');
     expect((await service.initialize()).tasks['retry']).toBe('❌ retained');
+  });
+
+  it('[task IDs] reserves across connections without reusing deleted task IDs', async () => {
+    const snapshot = await service.initialize();
+    const projectId = snapshot.projects[0].id;
+    const first = parseTasksString(snapshot.tasks[projectId])[0].id!;
+    const other = new ProjectStorageService();
+    try {
+      const [left, right] = await Promise.all([service.allocateTaskIds(2), other.allocateTaskIds(2)]);
+      expect(new Set([first, ...left, ...right]).size).toBe(5);
+      await service.setProjectTasks(projectId, stringifyTasks([createEmptyTask(left[0])]));
+      await service.setProjectTasks(projectId, '❌ deleted row replaced');
+      const [next] = await other.allocateTaskIds(1);
+      expect(next).toBeGreaterThan(Math.max(...left, ...right));
+      const backup = await service.exportBackup();
+      backup.tasks[projectId] = stringifyTasks([createEmptyTask(next)]);
+      await service.restoreBackup(backup);
+      expect(parseTasksString((await service.initialize()).tasks[projectId])[0].id).toBe(next);
+      expect((await service.allocateTaskIds(1))[0]).toBe(next + 1);
+    } finally {
+      const connection = await (other as unknown as { database?: Promise<IDBDatabase> }).database;
+      connection?.close();
+    }
+  });
+
+  it('[task IDs] creates stable placeholders without backfilling legacy task rows', async () => {
+    localStorage.setItem('taskList:projects', JSON.stringify([{ id: 'legacy', name: 'Legacy' }]));
+    localStorage.setItem('taskList:legacy', '❌ existing without id');
+    expect((await service.initialize()).tasks['legacy']).toBe('❌ existing without id');
+    await service.createProject({ id: 'new', name: 'New' });
+    const first = parseTasksString(await service.getProjectTasks('new'))[0].id;
+    expect(first).toBeDefined();
+    expect(parseTasksString((await service.initialize()).tasks['new'])[0].id).toBe(first);
   });
 });
 
