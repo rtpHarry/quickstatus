@@ -80,11 +80,42 @@
       </ion-content>
     </ng-template>
   </ion-modal>
+
+  <ion-modal #restoreModal [backdropDismiss]="!storageBusy">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-buttons slot="start">
+            <ion-button (click)="cancelRestoreBackup()" [disabled]="storageBusy">Cancel</ion-button>
+          </ion-buttons>
+          <ion-title>Restore Backup</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="confirmRestoreBackup()" [disabled]="storageBusy || !restoreContent.trim()" [strong]="true">
+              Restore
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <p>Restoring replaces all projects, tasks, and history with this backup.</p>
+        <p>Paste a backup below. Older Quick Status backup scripts are also accepted.</p>
+        <ion-textarea
+          [(ngModel)]="restoreContent"
+          [disabled]="storageBusy"
+          label="Backup contents"
+          labelPlacement="stacked"
+          placeholder="Paste your backup here"
+          [rows]="12"
+        ></ion-textarea>
+        <p *ngIf="restoreError" role="alert">{{ restoreError }}</p>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
 </ion-content>
 
-<ion-footer [attr.inert]="storageBusy || !selectedProjectId ? '' : null">
+<ion-footer>
   <ion-toolbar>
-    <ion-buttons slot="end">
+    <ion-buttons slot="end" [attr.inert]="storageBusy || !selectedProjectId ? '' : null">
       <ion-button
         (click)="undoDelete()"
         [disabled]="!hasUndoHistoryForActiveProject()"
@@ -104,6 +135,10 @@
       <ion-button (click)="taskList.copyBackupToClipboard()">
         <ion-icon slot="start" name="archive-outline"></ion-icon>
         Backup
+      </ion-button>
+      <ion-button (click)="openRestoreBackup()" [disabled]="storageBusy">
+        <ion-icon slot="start" name="arrow-undo-outline"></ion-icon>
+        Restore Backup
       </ion-button>
       <ion-button id="open-paste-modal">
         <ion-icon slot="start" name="clipboard-outline"></ion-icon>

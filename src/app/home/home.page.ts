@@ -1,4 +1,5 @@
 import { NgFor, NgIf } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, ViewChild } from '@angular/core';
 import {
   AlertController,
@@ -17,6 +18,7 @@ import {
   IonSegment,
   IonSegmentButton,
   IonTitle,
+  IonTextarea,
   IonToolbar,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -68,6 +70,8 @@ interface DeletedTaskEntry {
     IonSegmentButton,
     IonLabel,
     IonTitle,
+    IonTextarea,
+    FormsModule,
     IonContent,
     IonFooter,
     IonModal,
@@ -82,6 +86,7 @@ interface DeletedTaskEntry {
 export class HomePage implements OnInit {
   @ViewChild(TaskListComponent) taskListComponent?: TaskListComponent;
   @ViewChild('reorderModal') reorderModal?: IonModal;
+  @ViewChild('restoreModal') restoreModal?: IonModal;
   @ViewChild(IonSegment) segment?: IonSegment;
 
   projects: Project[] = [];
@@ -94,6 +99,8 @@ export class HomePage implements OnInit {
   readonly reorderProjectSegmentValue = '__reorder_projects__';
 
   storageBusy = true;
+  restoreContent = '';
+  restoreError = '';
 
   constructor(
     private alertController: AlertController,
@@ -121,6 +128,41 @@ export class HomePage implements OnInit {
       this.selectedProjectId = this.projects[0].id;
       this.currentTasksString = snapshot.tasks[this.selectedProjectId];
     });
+  }
+
+  async openRestoreBackup() {
+    if (this.storageBusy) return;
+    this.restoreContent = '';
+    this.restoreError = '';
+    await this.restoreModal?.present();
+  }
+
+  async cancelRestoreBackup() {
+    if (!this.storageBusy) await this.restoreModal?.dismiss();
+  }
+
+  async confirmRestoreBackup() {
+    if (this.storageBusy || !this.restoreContent.trim()) return;
+    this.flushPendingTaskChanges();
+    this.storageBusy = true;
+    this.restoreError = '';
+    this.changeDetectorRef.markForCheck();
+    try {
+      await this.storage.restoreBackupText(this.restoreContent);
+      const snapshot = await this.storage.initialize();
+      this.projects = snapshot.projects;
+      this.deleteHistoryByProject = {};
+      this.projects.forEach((project) => this.deleteHistoryByProject[project.id] = []);
+      this.selectedProjectId = this.projects[0].id;
+      this.currentTasksString = snapshot.tasks[this.selectedProjectId];
+      this.restoreContent = '';
+      await this.restoreModal?.dismiss();
+    } catch (error) {
+      this.restoreError = error instanceof Error ? error.message : 'Unable to restore backup';
+    } finally {
+      this.storageBusy = false;
+      this.changeDetectorRef.markForCheck();
+    }
   }
 
   handleTaskListChange(combinedList: string) {

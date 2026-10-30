@@ -223,8 +223,8 @@ export class TaskListComponent implements OnDestroy {
   async copyBackupToClipboard() {
     this.flushPendingChanges();
     try {
-      const restoreSnippet = await this.storage.createRestoreSnippet();
-      this.copyTextToClipboard(restoreSnippet, 'Backup copied to clipboard');
+      const backup = await this.storage.exportBackupText();
+      this.copyTextToClipboard(backup, 'Backup copied. Use Restore Backup to restore it.');
     } catch (error) {
       console.error('Failed to export backup:', error);
       await this.showToast('Unable to export backup');
