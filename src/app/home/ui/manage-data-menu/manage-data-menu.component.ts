@@ -2,28 +2,28 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { IonActionSheet, IonButton, IonIcon } from '@ionic/angular/standalone';
 import { ActionSheetButton, OverlayEventDetail } from '@ionic/core/components';
 import { addIcons } from 'ionicons';
-import { shareOutline } from 'ionicons/icons';
+import { optionsOutline } from 'ionicons/icons';
 
-export type ExportAction = 'import' | 'export' | 'copy' | 'copy-private' | 'paste';
+export type ManageDataAction = 'import' | 'export' | 'copy' | 'copy-private' | 'paste';
 
 @Component({
-  selector: 'app-export-menu',
+  selector: 'app-manage-data-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [IonActionSheet, IonButton, IonIcon],
-  templateUrl: './export-menu.component.html',
-  styleUrls: ['./export-menu.component.scss'],
+  templateUrl: './manage-data-menu.component.html',
+  styleUrls: ['./manage-data-menu.component.scss'],
 })
-export class ExportMenuComponent {
+export class ManageDataMenuComponent {
   @Input() busy = false;
   @Input() hasProject = false;
-  @Output() actionSelected = new EventEmitter<ExportAction>();
+  @Output() actionSelected = new EventEmitter<ManageDataAction>();
 
   isOpen = false;
-  buttons: ActionSheetButton<ExportAction>[] = [];
+  buttons: ActionSheetButton<ManageDataAction>[] = [];
 
   constructor() {
-    addIcons({ shareOutline });
+    addIcons({ optionsOutline });
   }
 
   open(): void {
@@ -42,7 +42,7 @@ export class ExportMenuComponent {
     this.isOpen = true;
   }
 
-  onDismiss(event: CustomEvent<OverlayEventDetail<ExportAction>>): void {
+  onDismiss(event: CustomEvent<OverlayEventDetail<ManageDataAction>>): void {
     this.isOpen = false;
     const action = event.detail.data;
 

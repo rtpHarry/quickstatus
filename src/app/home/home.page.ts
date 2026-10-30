@@ -32,7 +32,7 @@ import {
 import { KeyboardShortcutsComponent } from './ui/keyboard-shortcuts/keyboard-shortcuts.component';
 import { TaskListComponent } from './ui/task-list/task-list.component';
 import { ProjectStatsBarComponent } from './ui/project-stats-bar/project-stats-bar.component';
-import { ExportAction, ExportMenuComponent } from './ui/export-menu/export-menu.component';
+import { ManageDataAction, ManageDataMenuComponent } from './ui/manage-data-menu/manage-data-menu.component';
 import {
   createEmptyTask,
   parseTasksString,
@@ -83,7 +83,7 @@ interface DeletedTaskEntry {
     IonReorderGroup,
     TaskListComponent,
     ProjectStatsBarComponent,
-    ExportMenuComponent,
+    ManageDataMenuComponent,
     KeyboardShortcutsComponent,
   ],
 })
@@ -139,7 +139,7 @@ export class HomePage implements OnInit {
     await this.restoreModal?.present();
   }
 
-  async handleExportAction(action: ExportAction): Promise<void> {
+  async handleManageDataAction(action: ManageDataAction): Promise<void> {
     if (this.storageBusy) {
       return;
     }
