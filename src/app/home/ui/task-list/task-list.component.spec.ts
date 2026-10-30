@@ -1,6 +1,7 @@
 import { TaskListComponent } from './task-list.component';
 import { ProjectActivityMutation } from '../../analytics/task-activity.types';
-import { parseTasksString } from './task-list.utils';
+import { parseTasksString, Task } from './task-list.utils';
+import { DefaultIterableDiffer } from '@angular/core';
 
 describe('New task row identities', () => {
   function setup() {
@@ -13,12 +14,61 @@ describe('New task row identities', () => {
         return [];
       },
     };
+    const changeDetector = {
+      markForCheck: () => undefined,
+      detectChanges: () => undefined,
+    };
     const component = new TaskListComponent({} as never, {} as never,
-      { markForCheck: () => undefined } as never, storage as never);
+      changeDetector as never, storage as never);
     component.projectId = 'project-a';
     component.tasksString = '❌ Existing [id:1]';
-    return { component, storage, mutations };
+    return { component, storage, mutations, changeDetector };
   }
+
+  it('[focus] retains the input row through immutable typing and save feedback', async () => {
+    const { component } = setup();
+    component.tasksString = '❌ [id:1]';
+    const differ = new DefaultIterableDiffer<Task>(component.trackTask);
+    differ.diff(component.tasks);
+    component.listChange.subscribe((value) => {
+      component.tasksString = value;
+    });
+
+    for (const text of ['A', 'Ab', 'Abc']) {
+      component.onTaskChange({ ...component.tasks[0], text }, 0);
+      const changes = differ.diff(component.tasks);
+      const recreatedRows: unknown[] = [];
+      changes?.forEachAddedItem((row) => recreatedRows.push(row));
+      changes?.forEachRemovedItem((row) => recreatedRows.push(row));
+      expect(recreatedRows).toEqual([]);
+    }
+
+    await component.flushPendingChanges();
+    expect(component.tasks[0].text).toBe('Abc');
+    expect(differ.diff(component.tasks)).toBeNull();
+    component.ngOnDestroy();
+  });
+
+  it('[focus] renders an asynchronously inserted row before focusing its input', async () => {
+    const { component, changeDetector } = setup();
+    const calls: string[] = [];
+    const focusInput = jasmine.createSpy('focusInput').and.callFake(async () => {
+      calls.push('focus');
+    });
+    spyOn(changeDetector, 'detectChanges').and.callFake(() => {
+      calls.push('render');
+      component.taskItems = {
+        get: (index: number) => index === 1 ? { focusInput } : undefined,
+      } as never;
+    });
+
+    await component.addTask(0);
+
+    expect(component.tasks.map((task) => task.id)).toEqual([1, 100]);
+    expect(calls).toEqual(['render', 'focus']);
+    expect(focusInput).toHaveBeenCalledTimes(1);
+    component.ngOnDestroy();
+  });
 
   it('[task IDs] waits for queued additions and preserves identity through edits and reorder', async () => {
     const { component } = setup();

@@ -1,5 +1,15 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, Input, OnDestroy, OnInit, Output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  ViewChild,
+} from '@angular/core';
 import { Task, taskAgeInDays } from '../task-list/task-list.utils';
 import { FormsModule } from '@angular/forms';
 import {
@@ -35,6 +45,7 @@ import { lockClosedOutline, lockOpenOutline, textOutline } from 'ionicons/icons'
 export class TaskItemComponent implements OnInit, OnDestroy {
   @Input() task!: Task;
   @Output() taskChange = new EventEmitter<Task>();
+  @ViewChild(IonInput) input!: IonInput;
   private ageRefreshTimer?: ReturnType<typeof setInterval>;
 
   get ageBadge(): { text: string; label: string } | null {
@@ -72,6 +83,10 @@ export class TaskItemComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearInterval(this.ageRefreshTimer);
+  }
+
+  focusInput(): Promise<void> {
+    return this.input.setFocus();
   }
 
   private updateTask(change: Partial<Task>) {

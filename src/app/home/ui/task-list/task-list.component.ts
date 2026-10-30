@@ -7,7 +7,9 @@ import {
   Input,
   OnDestroy,
   Output,
+  QueryList,
   ViewChild,
+  ViewChildren,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
@@ -105,6 +107,7 @@ export class TaskListComponent implements OnDestroy {
 
   @ViewChild(IonModal) modal!: IonModal;
   @ViewChild('pasteTextarea') pasteTextarea!: IonTextarea;
+  @ViewChildren(TaskItemComponent) taskItems!: QueryList<TaskItemComponent>;
 
   constructor(
     private toastController: ToastController,
@@ -125,16 +128,21 @@ export class TaskListComponent implements OnDestroy {
     this.clearListChangeTimer();
   }
 
+  trackTask(index: number, task: Task): number {
+    return task.id ?? index;
+  }
+
   async addTask(index?: number) {
     await this.queueRowCreation(([id]) => {
       const insertIndex = index !== undefined ? index + 1 : this.tasks.length;
       this.tasks.splice(insertIndex, 0, createEmptyTask(id));
-      setTimeout(() => {
-        const input = document.querySelectorAll('ion-input')[insertIndex];
-        if (input) {
-          input.setFocus();
-        }
-      });
+      // The ID reservation completes asynchronously. Render the inserted row
+      // before asking its input to take focus.
+      this.changeDetectorRef.detectChanges();
+      const newTaskItem = this.taskItems?.get(insertIndex);
+      if (newTaskItem) {
+        void newTaskItem.focusInput();
+      }
     });
   }
 

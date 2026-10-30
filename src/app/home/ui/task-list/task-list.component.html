@@ -1,6 +1,6 @@
 <ion-list>
   <ion-reorder-group (ionItemReorder)="reorderTasks($event)" disabled="false">
-    <ion-item *ngFor="let task of tasks; let i = index" style="width: 100%">
+    <ion-item *ngFor="let task of tasks; let i = index; trackBy: trackTask" style="width: 100%">
       <ion-reorder slot="start"></ion-reorder>
       <app-task-item
         [task]="task"
