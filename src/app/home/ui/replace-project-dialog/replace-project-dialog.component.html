@@ -1,0 +1,31 @@
+<ion-modal [backdropDismiss]="!busy">
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-button (click)="cancel()" [disabled]="busy">Cancel</ion-button>
+        </ion-buttons>
+        <ion-title>Create Replacement Project</ion-title>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <p>Create a replacement before deleting “{{ projectName }}” and its tasks. Cancel keeps your current project.</p>
+      <ion-input
+        label="New project name"
+        labelPlacement="stacked"
+        [(ngModel)]="name"
+        [disabled]="busy"
+        (keydown.enter)="submit()"
+      ></ion-input>
+      @if (error) {
+        <p role="alert">{{ error }}</p>
+      }
+      <ion-button
+        class="confirm-button"
+        color="danger"
+        (click)="submit()"
+        [disabled]="busy || !name.trim()"
+      >Create and Delete Old Project</ion-button>
+    </ion-content>
+  </ng-template>
+</ion-modal>

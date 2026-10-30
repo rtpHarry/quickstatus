@@ -251,6 +251,60 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
       expect(committed).toBe(0);
     } finally { subscription.unsubscribe(); }
   });
+  it('replaces the last project atomically and preserves its task history', async () => {
+    const initial = await service.initialize();
+    const oldProject = initial.projects[0];
+    const task = parseTasksString(initial.tasks[oldProject.id])[0];
+    const populated = { ...task, text: 'Existing task' };
+    await service.commitTaskActivity({
+      projectId: oldProject.id,
+      tasks: stringifyTasks([populated]),
+      events: [{
+        taskId: task.id!,
+        type: 'entered',
+        source: 'normal',
+        before: taskFacts(task),
+        after: taskFacts(populated),
+      }],
+    });
+
+    const tasks = await service.replaceLastProject(oldProject.id, {
+      id: 'replacement',
+      name: 'Replacement',
+    });
+    const snapshot = await service.exportSnapshot();
+    const backup = await service.exportBackup();
+
+    expect(snapshot.projects).toEqual([{ id: 'replacement', name: 'Replacement' }]);
+    expect(snapshot.tasks['replacement']).toBe(tasks);
+    expect(parseTasksString(tasks)[0].id).not.toBe(task.id);
+    expect(backup.projects.find((project) => project.id === oldProject.id)?.archived).toBeTrue();
+    expect((await service.getTaskActivity(oldProject.id)).map((event) => event.type))
+      .toEqual(['entered', 'deleted']);
+    expect((await service.getDailySummary(oldProject.id, localActivityDate()))?.remaining).toBe(0);
+    expect(await service.getTrackingBaseline('replacement')).toBeDefined();
+  });
+
+  it('rolls back the deletion and events if the replacement cannot be created', async () => {
+    const initial = await service.initialize();
+    const oldProject = initial.projects[0];
+    await service.createProject({ id: 'taken', name: 'Archived' });
+    await service.deleteProject('taken');
+    const before = await service.exportBackup();
+    let notifications = 0;
+    const subscription = service.committedActivity$.subscribe(() => notifications++);
+
+    try {
+      await expectAsync(service.replaceLastProject(oldProject.id, {
+        id: 'taken',
+        name: 'Collision forces creation failure',
+      })).toBeRejected();
+      expect(await service.exportBackup()).toEqual(before);
+      expect(notifications).toBe(0);
+    } finally {
+      subscription.unsubscribe();
+    }
+  });
 });
 
 function deleteDatabase(): Promise<void> {

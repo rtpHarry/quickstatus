@@ -33,6 +33,7 @@ import { KeyboardShortcutsComponent } from './ui/keyboard-shortcuts/keyboard-sho
 import { TaskListComponent } from './ui/task-list/task-list.component';
 import { ProjectStatsBarComponent } from './ui/project-stats-bar/project-stats-bar.component';
 import { ManageDataAction, ManageDataMenuComponent } from './ui/manage-data-menu/manage-data-menu.component';
+import { ReplaceProjectDialogComponent, ReplaceProjectRequest } from './ui/replace-project-dialog/replace-project-dialog.component';
 import {
   createEmptyTask,
   parseTasksString,
@@ -84,6 +85,7 @@ interface DeletedTaskEntry {
     TaskListComponent,
     ProjectStatsBarComponent,
     ManageDataMenuComponent,
+    ReplaceProjectDialogComponent,
     KeyboardShortcutsComponent,
   ],
 })
@@ -92,6 +94,9 @@ export class HomePage implements OnInit {
   @ViewChild('reorderModal') reorderModal?: IonModal;
   @ViewChild('restoreModal') restoreModal?: IonModal;
   @ViewChild(IonSegment) segment?: IonSegment;
+  @ViewChild(ReplaceProjectDialogComponent) replaceProjectDialog?: ReplaceProjectDialogComponent;
+
+  replacementError = '';
 
   projects: Project[] = [];
   selectedProjectId = '';
@@ -309,9 +314,10 @@ export class HomePage implements OnInit {
         {
           text: 'Delete',
           role: 'destructive',
-          handler: () => {
-            this.confirmDeleteProject();
-            return false; // Prevent alert from closing
+          handler: async () => {
+            await alert.dismiss();
+            await this.confirmDeleteProject();
+            return false; // Already dismissed before opening the next dialog.
           },
         },
         {
@@ -352,14 +358,9 @@ export class HomePage implements OnInit {
       return;
     }
 
-    // Prevent deleting the last project
     if (this.projects.length === 1) {
-      const alert = await this.alertController.create({
-        header: 'Cannot Delete',
-        message: 'You must have at least one project.',
-        buttons: ['OK'],
-      });
-      await alert.present();
+      this.replacementError = '';
+      await this.replaceProjectDialog?.open(currentProject, this.generateNextProjectName());
       return;
     }
 
@@ -382,6 +383,39 @@ export class HomePage implements OnInit {
     });
 
     await alert.present();
+  }
+
+  async replaceLastProject(request: ReplaceProjectRequest): Promise<void> {
+    if (this.storageBusy) {
+      return;
+    }
+
+    this.storageBusy = true;
+    this.replacementError = '';
+    this.changeDetectorRef.markForCheck();
+
+    try {
+      await this.flushPendingTaskChanges();
+      const replacement: Project = {
+        id: this.storage.newProjectId(),
+        name: request.name,
+      };
+      const tasks = await this.storage.replaceLastProject(request.projectId, replacement);
+
+      this.projects = [replacement];
+      this.deleteHistoryByProject = { [replacement.id]: [] };
+      this.selectedProjectId = replacement.id;
+      this.currentTasksString = tasks;
+      await this.analytics.selectProject(replacement.id);
+      await this.replaceProjectDialog?.close();
+    } catch (error) {
+      this.replacementError = error instanceof Error
+        ? error.message
+        : 'Unable to replace the project. Please try again.';
+    } finally {
+      this.storageBusy = false;
+      this.changeDetectorRef.markForCheck();
+    }
   }
 
   private async deleteProject(projectId: string) {
