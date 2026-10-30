@@ -1,0 +1,21 @@
+<ion-toolbar>
+  <div class="project-stats" role="status" aria-live="polite" aria-atomic="true">
+    @if (loading) {
+      <span>Loading today's stats…</span>
+    } @else if (!hasProject) {
+      <span>Select a project to view today's stats.</span>
+    } @else if (error) {
+      <span>Today's stats are unavailable.</span>
+    } @else if (summary) {
+      <span>Today:</span>
+      <span>
+        <strong>{{ summary.completed }}</strong> completed
+        ({{ summary.completedNew }} new / {{ summary.completedExisting }} existing)
+      </span>
+      <span><strong>{{ summary.remaining }}</strong> remaining</span>
+      <span><strong>{{ summary.created }}</strong> created</span>
+    } @else {
+      <span>Loading today's stats…</span>
+    }
+  </div>
+</ion-toolbar>

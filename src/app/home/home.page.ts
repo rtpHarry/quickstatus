@@ -1,4 +1,4 @@
-import { NgFor, NgIf } from '@angular/common';
+import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, ViewChild } from '@angular/core';
 import {
@@ -35,6 +35,7 @@ import {
 } from 'ionicons/icons';
 import { KeyboardShortcutsComponent } from './ui/keyboard-shortcuts/keyboard-shortcuts.component';
 import { TaskListComponent } from './ui/task-list/task-list.component';
+import { ProjectStatsBarComponent } from './ui/project-stats-bar/project-stats-bar.component';
 import {
   createEmptyTask,
   parseTasksString,
@@ -47,6 +48,7 @@ import { ProjectStorageService } from './data/project-storage.service';
 import { Project } from './data/project-storage.types';
 import { TaskActivityDraft } from './analytics/task-activity.types';
 import { restoredTaskEvent, taskRemovalEvents } from './analytics/task-actions';
+import { ProjectAnalyticsService } from './analytics/project-analytics.service';
 
 interface DeletedTaskEntry {
   projectId: string;
@@ -61,6 +63,7 @@ interface DeletedTaskEntry {
   styleUrls: ['home.page.scss'],
   standalone: true,
   imports: [
+    AsyncPipe,
     IonButton,
     IonButtons,
     IonIcon,
@@ -82,6 +85,7 @@ interface DeletedTaskEntry {
     IonReorder,
     IonReorderGroup,
     TaskListComponent,
+    ProjectStatsBarComponent,
     KeyboardShortcutsComponent,
   ],
 })
@@ -107,7 +111,8 @@ export class HomePage implements OnInit {
   constructor(
     private alertController: AlertController,
     private changeDetectorRef: ChangeDetectorRef,
-    private storage: ProjectStorageService
+    private storage: ProjectStorageService,
+    readonly analytics: ProjectAnalyticsService
   ) {
     addIcons({
       addCircleOutline,
@@ -129,6 +134,7 @@ export class HomePage implements OnInit {
       this.projects.forEach((project) => this.deleteHistoryByProject[project.id] = []);
       this.selectedProjectId = this.projects[0].id;
       this.currentTasksString = snapshot.tasks[this.selectedProjectId];
+      await this.analytics.selectProject(this.selectedProjectId);
     });
   }
 
@@ -157,6 +163,7 @@ export class HomePage implements OnInit {
       this.projects.forEach((project) => this.deleteHistoryByProject[project.id] = []);
       this.selectedProjectId = this.projects[0].id;
       this.currentTasksString = snapshot.tasks[this.selectedProjectId];
+      await this.analytics.selectProject(this.selectedProjectId);
       this.restoreContent = '';
       await this.restoreModal?.dismiss();
     } catch (error) {
@@ -364,6 +371,7 @@ export class HomePage implements OnInit {
       delete this.deleteHistoryByProject[projectId];
       this.selectedProjectId = this.projects[0].id;
       this.currentTasksString = await this.storage.getProjectTasks(this.selectedProjectId);
+      await this.analytics.selectProject(this.selectedProjectId);
     });
   }
 
@@ -406,6 +414,7 @@ export class HomePage implements OnInit {
       const tasks = await this.storage.getProjectTasks(projectId);
       this.selectedProjectId = projectId;
       this.currentTasksString = tasks;
+      await this.analytics.selectProject(projectId);
     });
   }
 
@@ -422,6 +431,7 @@ export class HomePage implements OnInit {
       this.deleteHistoryByProject[project.id] = [];
       this.selectedProjectId = project.id;
       this.currentTasksString = await this.storage.getProjectTasks(project.id);
+      await this.analytics.selectProject(project.id);
       if (this.segment) this.segment.value = project.id;
     });
   }

@@ -115,6 +115,12 @@
 </ion-content>
 
 <ion-footer>
+  <app-project-stats-bar
+    [summary]="analytics.today$ | async"
+    [loading]="storageBusy"
+    [error]="analytics.error$ | async"
+    [hasProject]="!!selectedProjectId"
+  ></app-project-stats-bar>
   <ion-toolbar>
     <ion-buttons slot="end" [attr.inert]="storageBusy || !selectedProjectId ? '' : null">
       <ion-button

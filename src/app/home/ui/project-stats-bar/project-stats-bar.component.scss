@@ -1,0 +1,17 @@
+:host {
+  display: block;
+}
+
+ion-toolbar {
+  --min-height: 40px;
+}
+
+.project-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 8px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+}
