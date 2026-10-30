@@ -1,4 +1,8 @@
-use npm commands.
+# Development
+
+ionic serve
+
+# Deploy
 
 Bump version in package.json
 
