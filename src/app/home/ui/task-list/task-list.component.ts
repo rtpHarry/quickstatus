@@ -13,7 +13,6 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
-  AlertController,
   IonButton,
   IonButtons,
   IonContent,
@@ -35,7 +34,6 @@ import {
   addCircleOutline,
   clipboardOutline,
   copyOutline,
-  refreshOutline,
   trashOutline,
 } from 'ionicons/icons';
 import { pastedTaskEvents, taskChangeEvents, taskRemovalEvents } from '../../analytics/task-actions';
@@ -111,7 +109,6 @@ export class TaskListComponent implements OnDestroy {
 
   constructor(
     private toastController: ToastController,
-    private alertController: AlertController,
     private changeDetectorRef: ChangeDetectorRef,
     private storage: ProjectStorageService
   ) {
@@ -119,7 +116,6 @@ export class TaskListComponent implements OnDestroy {
       addCircleOutline,
       copyOutline,
       clipboardOutline,
-      refreshOutline,
       trashOutline,
     });
   }
@@ -271,29 +267,6 @@ export class TaskListComponent implements OnDestroy {
       console.error('Fallback: Oops, unable to copy', err);
     }
     document.body.removeChild(textArea);
-  }
-
-  async resetTasks() {
-    const alert = await this.alertController.create({
-      header: 'Reset List',
-      message: 'Are you sure you want to reset the list?',
-      buttons: [
-        {
-          text: 'Cancel',
-          role: 'cancel',
-        },
-        {
-          text: 'Yes',
-          handler: () => {
-            void this.queueRowCreation(([id]) => {
-              this.tasks = [createEmptyTask(id)];
-            }, 1, 'reset');
-          },
-        },
-      ],
-    });
-
-    await alert.present();
   }
 
   async openPaste(): Promise<void> {

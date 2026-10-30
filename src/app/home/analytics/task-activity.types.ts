@@ -9,7 +9,7 @@ export interface TaskFacts {
 }
 
 export type TaskActivityType = 'entered' | 'status-changed' | 'membership-changed' | 'deleted' | 'restored';
-export type TaskActivitySource = 'normal' | 'paste' | 'reset' | 'project-delete' | 'undo';
+export type TaskActivitySource = 'normal' | 'paste' | 'project-delete' | 'undo';
 
 export interface TaskActivityDraft {
   taskId: number;
@@ -98,7 +98,7 @@ export function isTaskActivity(value: unknown): value is TaskActivity {
     && typeof value['timestamp'] === 'string' && Number.isFinite(Date.parse(value['timestamp']))
     && typeof value['localDate'] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value['localDate'])
     && ['entered', 'status-changed', 'membership-changed', 'deleted', 'restored'].includes(value['type'] as string)
-    && ['normal', 'paste', 'reset', 'project-delete', 'undo'].includes(value['source'] as string)
+    && ['normal', 'paste', 'project-delete', 'undo'].includes(value['source'] as string)
     && (value['before'] === null || isTaskFacts(value['before']))
     && (value['after'] === null || isTaskFacts(value['after']))
     && (value['before'] !== null || value['after'] !== null);

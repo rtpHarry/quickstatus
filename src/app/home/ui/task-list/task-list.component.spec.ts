@@ -18,8 +18,11 @@ describe('New task row identities', () => {
       markForCheck: () => undefined,
       detectChanges: () => undefined,
     };
-    const component = new TaskListComponent({} as never, {} as never,
-      changeDetector as never, storage as never);
+    const component = new TaskListComponent(
+      {} as never,
+      changeDetector as never,
+      storage as never
+    );
     component.projectId = 'project-a';
     component.tasksString = '❌ Existing [id:1]';
     return { component, storage, mutations, changeDetector };

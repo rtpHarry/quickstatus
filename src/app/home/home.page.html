@@ -140,10 +140,6 @@
         [hasProject]="!!selectedProjectId"
         (actionSelected)="handleExportAction($event)"
       ></app-export-menu>
-      <ion-button (click)="taskList.resetTasks()" color="danger" [disabled]="storageBusy || !selectedProjectId">
-        <ion-icon slot="start" name="refresh-outline"></ion-icon>
-        Reset List
-      </ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-footer>

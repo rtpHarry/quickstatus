@@ -27,7 +27,6 @@ import {
   addOutline,
   arrowUndoOutline,
   createOutline,
-  refreshOutline,
   reorderThreeOutline,
 } from 'ionicons/icons';
 import { KeyboardShortcutsComponent } from './ui/keyboard-shortcuts/keyboard-shortcuts.component';
@@ -116,7 +115,6 @@ export class HomePage implements OnInit {
     addIcons({
       addCircleOutline,
       arrowUndoOutline,
-      refreshOutline,
       addOutline,
       createOutline,
       reorderThreeOutline,
