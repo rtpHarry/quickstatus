@@ -1,7 +1,7 @@
 import { openProjectDatabase, projectDatabaseName } from './project-storage.database';
 import { ProjectStorageService } from './project-storage.service';
 import { createEmptyTask, parseTasksString, stringifyTasks } from '../ui/task-list/task-list.utils';
-import { TaskActivityDraft, taskFacts } from '../analytics/task-activity.types';
+import { dailySummaryKey, localActivityDate, TaskActivityDraft, taskFacts } from '../analytics/task-activity.types';
 
 /** Real browser IndexedDB checks; no Angular fixture or application build needed. */
 describe('ProjectStorageService IndexedDB migration and restore', () => {
@@ -63,10 +63,13 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
       before: taskFacts(createEmptyTask(2)), after: null }];
     backup.analytics['baseline'] = { projectId: id, tracked: true };
     await service.restoreBackup(backup);
+    const normalized = await service.exportBackup();
+    expect(normalized.events).toEqual(backup.events);
+    expect(normalized.metadata).toEqual(backup.metadata);
     const exported = await service.exportBackupText();
     await service.setProjectTasks(id, '❌ later');
     await service.restoreBackupText(exported);
-    expect(await service.exportBackup()).toEqual(backup);
+    expect(await service.exportBackup()).toEqual(normalized);
     expect((await service.initialize()).projects.length).toBe(1);
   });
 
@@ -209,6 +212,12 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
       expect(await service.getTaskActivity(projectId, event.localDate, event.localDate)).toEqual([event]);
       expect(await service.getTaskActivity('another-project')).toEqual([]);
       expect(JSON.stringify(event)).not.toContain('new task');
+      expect(await service.getDailySummary(projectId, event.localDate)).toEqual(jasmine.objectContaining({
+        created: 1, completed: 0, remaining: 1, closingTotal: 1,
+      }));
+      const saved = await service.getDailySummary(projectId, event.localDate);
+      await service.restoreBackup(await service.exportBackup());
+      expect(await service.getDailySummary(projectId, event.localDate)).toEqual(saved);
     } finally { subscription.unsubscribe(); }
   });
 
@@ -219,13 +228,24 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     const before = await service.exportBackup();
     let committed = 0;
     const subscription = service.committedActivity$.subscribe(() => committed++);
+    const internal = service as unknown as {
+      write: (stores: string[], operation: (transaction: IDBTransaction) => Promise<unknown>) => Promise<unknown>;
+    };
+    const original = internal.write.bind(service);
+    // Throw after derived summary writes are queued, before the enclosing commit.
+    spyOn(internal, 'write').and.callFake((stores, operation) => original(stores, async (tx) => {
+      await operation(tx);
+      expect(await new Promise((resolve) => {
+        const request = tx.objectStore('analytics').get(dailySummaryKey(projectId, localActivityDate()));
+        request.onsuccess = () => resolve(request.result.created);
+      })).toBe(1);
+      throw new Error('forced transaction failure');
+    }));
     try {
       await expectAsync(service.commitTaskActivity({
         projectId, tasks: stringifyTasks([{ ...task, text: 'must roll back' }]),
         events: [{ taskId: task.id!, type: 'entered', source: 'normal',
           before: taskFacts(task), after: taskFacts({ ...task, text: 'must roll back' }) }],
-        // Fail after list, event and counter writes have been queued.
-        projection: { schemaVersion: 1, projectId: 'wrong-project', lastEventId: 1, tasks: {} },
       })).toBeRejected();
       expect(await service.exportBackup()).toEqual(before);
       expect(committed).toBe(0);

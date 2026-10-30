@@ -35,10 +35,11 @@ export interface TaskTrackingBaseline {
   tasks: { taskId: number; facts: TaskFacts }[];
 }
 
-/** Storage contracts; reducers and automatic updates are added in step 7. */
+/** Reducer state retains deleted identities for cohort/undo history. */
 export interface ProjectTaskProjection {
   schemaVersion: 1;
   projectId: string;
+  reducerVersion: 1;
   lastEventId: number;
   tasks: Record<string, { facts: TaskFacts; arrivalDate: string | null; deleted: boolean }>;
 }
@@ -55,6 +56,9 @@ export interface ProjectDailySummary {
   remaining: number;
   closingCompleted: number;
   closingTotal: number;
+  /** Identity credits make repeated toggles idempotent within a day. */
+  createdTaskIds: number[];
+  completionCredits: { taskId: number; isNew: boolean }[];
 }
 
 export interface ProjectActivityMutation {
@@ -63,8 +67,6 @@ export interface ProjectActivityMutation {
   tasks: string | null;
   events: TaskActivityDraft[];
   archiveProject?: boolean;
-  projection?: ProjectTaskProjection;
-  summaries?: ProjectDailySummary[];
 }
 
 export interface CommittedProjectActivity {
