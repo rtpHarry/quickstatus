@@ -12,7 +12,7 @@
     </ion-toolbar>
   </ion-header>
 
-  <div id="container">
+  <div id="container" [attr.inert]="storageBusy || !selectedProjectId ? '' : null">
     <ion-segment
       class="project-segment"
       [value]="selectedProjectId"
@@ -82,7 +82,7 @@
   </ion-modal>
 </ion-content>
 
-<ion-footer>
+<ion-footer [attr.inert]="storageBusy || !selectedProjectId ? '' : null">
   <ion-toolbar>
     <ion-buttons slot="end">
       <ion-button

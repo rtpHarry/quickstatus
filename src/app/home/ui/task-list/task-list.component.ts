@@ -36,6 +36,7 @@ import {
   refreshOutline,
   trashOutline,
 } from 'ionicons/icons';
+import { ProjectStorageService } from '../../data/project-storage.service';
 import { TaskItemComponent } from '../task-item/task-item.component';
 import {
   createEmptyTask,
@@ -99,7 +100,8 @@ export class TaskListComponent implements OnDestroy {
   constructor(
     private toastController: ToastController,
     private alertController: AlertController,
-    private changeDetectorRef: ChangeDetectorRef
+    private changeDetectorRef: ChangeDetectorRef,
+    private storage: ProjectStorageService
   ) {
     addIcons({
       addCircleOutline,
@@ -218,58 +220,15 @@ export class TaskListComponent implements OnDestroy {
     );
   }
 
-  copyBackupToClipboard() {
+  async copyBackupToClipboard() {
     this.flushPendingChanges();
-    const backupData: Record<string, string> = {};
-    const projectsKey = 'taskList:projects';
-    const projectsValue = localStorage.getItem(projectsKey);
-
-    if (projectsValue !== null) {
-      backupData[projectsKey] = projectsValue;
-
-      try {
-        const projects = JSON.parse(projectsValue);
-        if (Array.isArray(projects)) {
-          projects.forEach((project) => {
-            if (
-              typeof project === 'object' &&
-              project !== null &&
-              typeof project.id === 'string'
-            ) {
-              const taskKey = `taskList:${project.id}`;
-              const taskValue = localStorage.getItem(taskKey);
-              if (taskValue !== null) {
-                backupData[taskKey] = taskValue;
-              }
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Failed to parse projects for backup:', error);
-      }
+    try {
+      const restoreSnippet = await this.storage.createRestoreSnippet();
+      this.copyTextToClipboard(restoreSnippet, 'Backup copied to clipboard');
+    } catch (error) {
+      console.error('Failed to export backup:', error);
+      await this.showToast('Unable to export backup');
     }
-
-    const backup = JSON.stringify(backupData, null, 2);
-    const restoreSnippet = `(() => {
-  const backup = JSON.parse(
-    \`${this.escapeTemplateLiteralContent(backup)}\`,
-  );
-
-  Object.keys(backup).forEach((key) => {
-    localStorage.setItem(key, backup[key]);
-  });
-
-  location.reload();
-})();`;
-
-    this.copyTextToClipboard(restoreSnippet, 'Backup copied to clipboard');
-  }
-
-  private escapeTemplateLiteralContent(value: string): string {
-    return value
-      .replace(/\\/g, '\\\\')
-      .replace(/`/g, '\\`')
-      .replace(/\$\{/g, '\\${');
   }
 
   copyTextToClipboard(text: string, successMessage: string) {

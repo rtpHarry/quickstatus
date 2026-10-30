@@ -41,10 +41,8 @@ import {
   TaskDeleteEvent,
 } from './ui/task-list/task-list.utils';
 
-interface Project {
-  id: string;
-  name: string;
-}
+import { ProjectStorageService } from './data/project-storage.service';
+import { Project } from './data/project-storage.types';
 
 interface DeletedTaskEntry {
   projectId: string;
@@ -95,13 +93,12 @@ export class HomePage implements OnInit {
   readonly addProjectSegmentValue = '__add_project__';
   readonly reorderProjectSegmentValue = '__reorder_projects__';
 
-  private readonly projectsStorageKey = 'taskList:projects';
-  private readonly legacyStorageKey = 'taskList';
-  private readonly projectKeyPrefix = 'taskList:';
+  storageBusy = true;
 
   constructor(
     private alertController: AlertController,
-    private changeDetectorRef: ChangeDetectorRef
+    private changeDetectorRef: ChangeDetectorRef,
+    private storage: ProjectStorageService
   ) {
     addIcons({
       addCircleOutline,
@@ -117,11 +114,17 @@ export class HomePage implements OnInit {
   }
 
   ngOnInit() {
-    this.initializeProjects();
+    void this.runStorageAction(async () => {
+      const snapshot = await this.storage.initialize();
+      this.projects = snapshot.projects;
+      this.projects.forEach((project) => this.deleteHistoryByProject[project.id] = []);
+      this.selectedProjectId = this.projects[0].id;
+      this.currentTasksString = snapshot.tasks[this.selectedProjectId];
+    });
   }
 
   handleTaskListChange(combinedList: string) {
-    this.persistTaskString(this.selectedProjectId, combinedList);
+    void this.persistTaskString(this.selectedProjectId, combinedList);
   }
 
   handleTaskDeleteRequest(event: TaskDeleteEvent) {
@@ -145,7 +148,7 @@ export class HomePage implements OnInit {
     });
 
     this.taskListComponent?.setPendingFocusIndex(event.nextFocusIndex);
-    this.persistTaskString(
+    void this.persistTaskString(
       this.selectedProjectId,
       stringifyTasks(ensureTaskListHasPlaceholder(tasks))
     );
@@ -179,7 +182,7 @@ export class HomePage implements OnInit {
     workingTasks.splice(insertIndex, 0, { ...deletedEntry.task });
 
     this.taskListComponent?.setPendingFocusIndex(insertIndex);
-    this.persistTaskString(
+    void this.persistTaskString(
       this.selectedProjectId,
       stringifyTasks(workingTasks)
     );
@@ -256,7 +259,7 @@ export class HomePage implements OnInit {
           handler: (data) => {
             const newName = data.projectName?.trim();
             if (newName && newName.length > 0) {
-              this.renameProject(this.selectedProjectId, newName);
+              void this.renameProject(currentProject.id, newName);
             }
           },
         },
@@ -266,17 +269,19 @@ export class HomePage implements OnInit {
     await alert.present();
   }
 
-  private renameProject(projectId: string, newName: string) {
+  private async renameProject(projectId: string, newName: string) {
     const projectIndex = this.projects.findIndex((p) => p.id === projectId);
     if (projectIndex === -1) {
       return;
     }
 
-    this.projects[projectIndex] = {
-      ...this.projects[projectIndex],
-      name: newName,
-    };
-    this.persistProjects();
+    await this.runStorageAction(async () => {
+      const projects = this.projects.map((project) =>
+        project.id === projectId ? { ...project, name: newName } : project
+      );
+      await this.storage.saveProjects(projects);
+      this.projects = projects;
+    });
   }
 
   async confirmDeleteProject() {
@@ -310,7 +315,7 @@ export class HomePage implements OnInit {
           text: 'Delete',
           role: 'destructive',
           handler: () => {
-            this.deleteProject(this.selectedProjectId);
+            void this.deleteProject(currentProject.id);
           },
         },
       ],
@@ -319,24 +324,16 @@ export class HomePage implements OnInit {
     await alert.present();
   }
 
-  private deleteProject(projectId: string) {
-    const projectIndex = this.projects.findIndex((p) => p.id === projectId);
-    if (projectIndex === -1) {
-      return;
-    }
-
-    // Remove project from array
-    this.projects.splice(projectIndex, 1);
-    this.persistProjects();
-
-    // Clean up localStorage for this project
-    const projectKey = this.buildProjectKey(projectId);
-    localStorage.removeItem(projectKey);
-    delete this.deleteHistoryByProject[projectId];
-
-    // Switch to another project (first available)
-    this.selectedProjectId = this.projects[0].id;
-    this.currentTasksString = this.getProjectTasks(this.selectedProjectId);
+  private async deleteProject(projectId: string) {
+    if (!this.projects.some((project) => project.id === projectId)) return;
+    this.flushPendingTaskChanges();
+    await this.runStorageAction(async () => {
+      await this.storage.deleteProject(projectId);
+      this.projects = this.projects.filter((project) => project.id !== projectId);
+      delete this.deleteHistoryByProject[projectId];
+      this.selectedProjectId = this.projects[0].id;
+      this.currentTasksString = await this.storage.getProjectTasks(this.selectedProjectId);
+    });
   }
 
   async showReorderProjectsDialog() {
@@ -359,162 +356,43 @@ export class HomePage implements OnInit {
   }
 
   async saveReorder() {
-    this.projects = [...this.reorderProjects];
-    this.persistProjects();
-    await this.reorderModal?.dismiss();
+    await this.runStorageAction(async () => {
+      const projects = [...this.reorderProjects];
+      await this.storage.saveProjects(projects);
+      this.projects = projects;
+      await this.reorderModal?.dismiss();
+    });
   }
 
   async cancelReorder() {
     await this.reorderModal?.dismiss();
   }
 
-  private generateUuid(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-  }
-
-  private initializeProjects() {
-    const storedProjectsRaw = localStorage.getItem(this.projectsStorageKey);
-    let storedProjects: Project[] | null = null;
-    let needsPersist = false;
-
-    if (storedProjectsRaw) {
-      try {
-        const parsed = JSON.parse(storedProjectsRaw);
-        if (Array.isArray(parsed)) {
-          // Check if it's the new format (array of objects with id and name)
-          if (
-            parsed.length > 0 &&
-            typeof parsed[0] === 'object' &&
-            'id' in parsed[0]
-          ) {
-            storedProjects = parsed.filter(
-              (item: unknown): item is Project =>
-                typeof item === 'object' &&
-                item !== null &&
-                'id' in item &&
-                'name' in item &&
-                typeof (item as Project).id === 'string' &&
-                typeof (item as Project).name === 'string' &&
-                (item as Project).id.trim().length > 0 &&
-                (item as Project).name.trim().length > 0
-            );
-          } else {
-            // Legacy format: array of strings - migrate to new format
-            storedProjects = this.migrateLegacyProjects(parsed);
-            needsPersist = true; // Mark that we need to persist the migrated data
-          }
-        }
-      } catch (error) {
-        console.error('Failed to parse stored projects:', error);
-      }
-    }
-
-    if (!storedProjects || storedProjects.length === 0) {
-      // Check for legacy string-based projects in localStorage
-      const legacyList = localStorage.getItem(this.legacyStorageKey);
-      const primaryId = this.generateUuid();
-      const primaryKey = this.buildProjectKey(primaryId);
-
-      // Check if there's existing data under old 'Primary' key
-      const oldPrimaryKey = this.buildProjectKey('Primary');
-      const existingPrimary = localStorage.getItem(oldPrimaryKey);
-      const initialList = legacyList ?? existingPrimary ?? '';
-
-      this.projects = [{ id: primaryId, name: 'Primary' }];
-      this.deleteHistoryByProject[primaryId] = [];
-      this.persistProjects();
-      localStorage.setItem(primaryKey, initialList);
-
-      // Clean up old keys
-      if (legacyList !== null) {
-        localStorage.removeItem(this.legacyStorageKey);
-      }
-      if (existingPrimary !== null) {
-        localStorage.removeItem(oldPrimaryKey);
-      }
-
-      this.selectedProjectId = primaryId;
-      this.currentTasksString = initialList;
-      return;
-    }
-
-    const uniqueProjects = this.deduplicateProjects(storedProjects);
-
-    this.projects = uniqueProjects;
-    this.projects.forEach((project) => {
-      this.deleteHistoryByProject[project.id] ??= [];
-    });
-    this.removeOrphanedProjectTaskStorage(this.projects);
-
-    // Persist if we migrated legacy storage into the current format
-    if (needsPersist) {
-      this.persistProjects();
-    }
-
-    this.selectedProjectId = this.projects[0].id;
-    this.currentTasksString = this.getProjectTasks(this.selectedProjectId);
-  }
-
-  private migrateLegacyProjects(legacyProjects: unknown[]): Project[] {
-    const stringProjects = legacyProjects.filter(
-      (item: unknown): item is string =>
-        typeof item === 'string' && item.trim().length > 0
-    );
-
-    return stringProjects.map((name) => {
-      const id = this.generateUuid();
-      const oldKey = this.buildProjectKey(name);
-      const newKey = this.buildProjectKey(id);
-
-      // Migrate data from old key to new key
-      const existingData = localStorage.getItem(oldKey);
-      if (existingData !== null) {
-        localStorage.setItem(newKey, existingData);
-        localStorage.removeItem(oldKey);
-      }
-
-      return { id, name };
-    });
-  }
-
-  private deduplicateProjects(projects: Project[]): Project[] {
-    const seen = new Map<string, Project>();
-    for (const project of projects) {
-      if (!seen.has(project.id)) {
-        seen.set(project.id, project);
-      }
-    }
-    return Array.from(seen.values());
-  }
-
-  private switchProject(projectId: string) {
+  private async switchProject(projectId: string) {
+    if (this.storageBusy) return;
     this.flushPendingTaskChanges();
-    this.selectedProjectId = projectId;
-    this.currentTasksString = this.getProjectTasks(projectId);
+    await this.runStorageAction(async () => {
+      const tasks = await this.storage.getProjectTasks(projectId);
+      this.selectedProjectId = projectId;
+      this.currentTasksString = tasks;
+    });
   }
 
-  private addProject() {
+  private async addProject() {
+    if (this.storageBusy) return;
     this.flushPendingTaskChanges();
-    const newProjectName = this.generateNextProjectName();
-    const newProjectId = this.generateUuid();
-    const newProject: Project = { id: newProjectId, name: newProjectName };
-    this.projects = [...this.projects, newProject];
-    this.deleteHistoryByProject[newProjectId] = [];
-    this.persistProjects();
-    this.selectedProjectId = newProjectId;
-    this.currentTasksString = '';
-    localStorage.setItem(this.buildProjectKey(newProjectId), '');
-
-    // Reset segment to the new project
-    setTimeout(() => {
-      if (this.segment) {
-        this.segment.value = newProjectId;
-      }
-    }, 0);
+    const project: Project = {
+      id: this.storage.newProjectId(),
+      name: this.generateNextProjectName(),
+    };
+    await this.runStorageAction(async () => {
+      await this.storage.createProject(project);
+      this.projects = [...this.projects, project];
+      this.deleteHistoryByProject[project.id] = [];
+      this.selectedProjectId = project.id;
+      this.currentTasksString = '';
+      if (this.segment) this.segment.value = project.id;
+    });
   }
 
   private generateNextProjectName(): string {
@@ -539,45 +417,45 @@ export class HomePage implements OnInit {
     return `${baseName} ${candidate}`;
   }
 
-  private getProjectTasks(projectId: string): string {
-    const stored = localStorage.getItem(this.buildProjectKey(projectId));
-    return stored ?? '';
+  private async persistTaskString(projectId: string, taskString: string) {
+    if (!projectId) return;
+    if (projectId === this.selectedProjectId) {
+      this.currentTasksString = taskString;
+      this.changeDetectorRef.markForCheck();
+    }
+    try {
+      await this.storage.setProjectTasks(projectId, taskString);
+    } catch (error) {
+      await this.showStorageError(error);
+    }
   }
 
-  private persistProjects() {
+  private async runStorageAction(action: () => Promise<void>): Promise<void> {
+    this.storageBusy = true;
     this.changeDetectorRef.markForCheck();
-    localStorage.setItem(
-      this.projectsStorageKey,
-      JSON.stringify(this.projects)
-    );
+    try {
+      await action();
+    } catch (error) {
+      await this.showStorageError(error);
+    } finally {
+      this.storageBusy = false;
+      this.changeDetectorRef.markForCheck();
+    }
   }
 
-  private removeOrphanedProjectTaskStorage(projects: Project[]) {
-    const projectIds = new Set(projects.map((project) => project.id));
-
-    Object.keys(localStorage)
-      .filter(
-        (key) =>
-          key.startsWith(this.projectKeyPrefix) &&
-          key !== this.projectsStorageKey &&
-          !projectIds.has(key.slice(this.projectKeyPrefix.length))
-      )
-      .forEach((key) => localStorage.removeItem(key));
-  }
-
-  private persistTaskString(projectId: string, taskString: string) {
-    this.changeDetectorRef.markForCheck();
-    this.currentTasksString = taskString;
-    localStorage.setItem(this.buildProjectKey(projectId), taskString);
+  private async showStorageError(error: unknown): Promise<void> {
+    console.error('Project storage operation failed:', error);
+    const alert = await this.alertController.create({
+      header: 'Unable to save or load tasks',
+      message: 'Your latest changes may not be saved. Please try again before leaving the app.',
+      buttons: ['OK'],
+    });
+    await alert.present();
   }
 
   private pushDeletedTask(entry: DeletedTaskEntry) {
     this.deleteHistoryByProject[entry.projectId] ??= [];
     this.deleteHistoryByProject[entry.projectId].push(entry);
-  }
-
-  private buildProjectKey(projectId: string) {
-    return `${this.projectKeyPrefix}${projectId}`;
   }
 
   private flushPendingTaskChanges() {
