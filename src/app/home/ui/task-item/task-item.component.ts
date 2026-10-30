@@ -85,8 +85,11 @@ export class TaskItemComponent implements OnInit, OnDestroy {
     clearInterval(this.ageRefreshTimer);
   }
 
-  focusInput(): Promise<void> {
-    return this.input.setFocus();
+  async focusInput(): Promise<void> {
+    // Angular can create the wrapper before Ionic renders its native input.
+    // setFocus() alone silently does nothing until that input exists.
+    await this.input.getInputElement();
+    await this.input.setFocus();
   }
 
   private updateTask(change: Partial<Task>) {
