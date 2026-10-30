@@ -1,3 +1,5 @@
+import { TaskActivity } from '../analytics/task-activity.types';
+
 export interface Project {
   id: string;
   name: string;
@@ -16,20 +18,12 @@ export interface StoredProject extends Project {
   archived?: boolean;
 }
 
-/** Step 5 will define the versioned activity payload. */
-export interface StoredActivity {
-  id: number;
-  projectId: string;
-  localDate: string;
-  [field: string]: unknown;
-}
-
 export interface ProjectStorageBackup {
   format: 'quickstatus-backup';
   version: 1;
   projects: StoredProject[];
   tasks: Record<string, string>;
   metadata: Record<string, unknown>;
-  events: StoredActivity[];
+  events: TaskActivity[];
   analytics: Record<string, unknown>;
 }

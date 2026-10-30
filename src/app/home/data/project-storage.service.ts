@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
-import { createEmptyTask, normalizeTaskListIds, stringifyTasks } from '../ui/task-list/task-list.utils';
+import { Subject } from 'rxjs';
+import { baselineKey, CommittedProjectActivity, dailySummaryKey, isTaskActivity, isTrackingBaseline, localActivityDate, ProjectActivityMutation, ProjectDailySummary, ProjectTaskProjection, projectionKey, TaskActivity, taskFacts, TaskTrackingBaseline } from '../analytics/task-activity.types';
+import { createEmptyTask, normalizeTaskListIds, parseTasksString, stringifyTasks } from '../ui/task-list/task-list.utils';
 import { idbRequest, openProjectDatabase, projectStoreNames, transactionDone } from './project-storage.database';
 import { LegacyStorageBackup, Project, ProjectStorageBackup, ProjectStorageSnapshot, StoredProject } from './project-storage.types';
 
@@ -10,6 +12,9 @@ export class ProjectStorageService {
   private readonly taskPrefix = 'taskList:';
   private pending: Promise<unknown> = Promise.resolve();
   private database?: Promise<IDBDatabase>;
+  private readonly activitySubject = new Subject<CommittedProjectActivity>();
+  /** Only successful atomic activity mutations publish, after their commit. */
+  readonly committedActivity$ = this.activitySubject.asObservable();
 
   /** Reads and exports wait for already submitted writes. */
   private enqueue<T>(operation: () => Promise<T>): Promise<T> {
@@ -40,6 +45,7 @@ export class ProjectStorageService {
           this.writeBackup(transaction, this.baselineBackup(snapshot));
         }
         await this.normalizeStoredTaskIds(transaction);
+        await this.ensureTrackingBaselines(transaction);
         await done;
       } catch (error) {
         try { transaction.abort(); } catch { /* It may already have aborted. */ }
@@ -86,6 +92,111 @@ export class ProjectStorageService {
     if (normalized.nextTaskId !== next) metadata.put(normalized.nextTaskId, 'nextTaskId');
   }
 
+  private async ensureTrackingBaselines(transaction: IDBTransaction): Promise<void> {
+    const rows = await idbRequest<{ projectId: string; tasks: string }[]>(transaction.objectStore('lists').getAll());
+    for (const row of rows) await this.ensureProjectBaseline(transaction, row.projectId, row.tasks);
+  }
+
+  private async ensureProjectBaseline(transaction: IDBTransaction, projectId: string, tasks: string): Promise<void> {
+    const analytics = transaction.objectStore('analytics');
+    const key = baselineKey(projectId);
+    const existing = await idbRequest(analytics.get(key));
+    if (existing !== undefined) {
+      if (!isTrackingBaseline(existing) || existing.projectId !== projectId) throw new Error('Invalid tracking baseline');
+      return;
+    }
+    const now = new Date();
+    const baseline: TaskTrackingBaseline = {
+      schemaVersion: 1, projectId, timestamp: now.toISOString(), localDate: localActivityDate(now),
+      tasks: parseTasksString(tasks).map((task) => {
+        if (!this.isId(task.id)) throw new Error('Tracking baseline requires task IDs');
+        return { taskId: task.id, facts: taskFacts(task) };
+      }),
+    };
+    analytics.add(baseline, key);
+  }
+
+  /** Step 6 supplies action facts; task state and history become durable together. */
+  commitTaskActivity(mutation: ProjectActivityMutation): Promise<TaskActivity[]> {
+    const copy: ProjectActivityMutation = JSON.parse(JSON.stringify(mutation));
+    const now = new Date();
+    return this.write([...projectStoreNames], async (transaction) => {
+      if (!Array.isArray(copy.events) || (copy.tasks !== null && typeof copy.tasks !== 'string')
+        || (copy.tasks === null && !copy.archiveProject)) throw new Error('Invalid task activity mutation');
+      const projects = transaction.objectStore('projects');
+      const project = await idbRequest<StoredProject | undefined>(projects.get(copy.projectId));
+      if (!project || project.archived) throw new Error('Activity requires an active project');
+      const lists = transaction.objectStore('lists');
+      const previous = await idbRequest<{ tasks: string } | undefined>(lists.get(copy.projectId));
+      if (!previous) throw new Error('Activity requires an existing task list');
+      await this.ensureProjectBaseline(transaction, copy.projectId, previous.tasks);
+      const metadata = transaction.objectStore('metadata');
+      const next = await idbRequest(metadata.get('nextEventId'));
+      if (!this.isId(next) || !Number.isSafeInteger(next + copy.events.length)) {
+        throw new Error('Event ID counter exhausted or invalid');
+      }
+      const events: TaskActivity[] = copy.events.map((draft, index) => ({
+        ...draft, schemaVersion: 1, id: next + index, projectId: copy.projectId,
+        timestamp: now.toISOString(), localDate: localActivityDate(now),
+      }));
+      if (!events.every(isTaskActivity)) throw new Error('Invalid task activity');
+      if (copy.tasks === null) lists.delete(copy.projectId);
+      else lists.put({ projectId: copy.projectId, tasks: copy.tasks });
+      if (copy.archiveProject) projects.put({ ...project, archived: true });
+      events.forEach((event) => transaction.objectStore('events').add(event));
+      metadata.put(next + events.length, 'nextEventId');
+      const analytics = transaction.objectStore('analytics');
+      if (copy.projection) {
+        if (copy.projection.projectId !== copy.projectId) throw new Error('Projection project mismatch');
+        analytics.put(copy.projection, projectionKey(copy.projectId));
+      }
+      for (const summary of copy.summaries ?? []) {
+        if (summary.projectId !== copy.projectId) throw new Error('Summary project mismatch');
+        analytics.put(summary, dailySummaryKey(copy.projectId, summary.localDate));
+      }
+      return events;
+    }).then((events) => {
+      // Do not expose the returned records to subscribers/callers by shared reference.
+      this.activitySubject.next({ projectId: copy.projectId, events: structuredClone(events) });
+      return events;
+    });
+  }
+
+  getTaskActivity(projectId: string, fromDate = '', toDate = '\uffff'): Promise<TaskActivity[]> {
+    return this.enqueue(async () => {
+      const db = await this.getDatabase();
+      const transaction = db.transaction('events', 'readonly');
+      const done = transactionDone(transaction);
+      const range = IDBKeyRange.bound([projectId, fromDate], [projectId, toDate]);
+      const events = await idbRequest<TaskActivity[]>(transaction.objectStore('events').index('projectDate').getAll(range));
+      await done;
+      return events.sort((left, right) => left.id - right.id);
+    });
+  }
+
+  getTrackingBaseline(projectId: string): Promise<TaskTrackingBaseline | undefined> {
+    return this.getAnalyticsRecord(baselineKey(projectId));
+  }
+
+  getTaskProjection(projectId: string): Promise<ProjectTaskProjection | undefined> {
+    return this.getAnalyticsRecord(projectionKey(projectId));
+  }
+
+  getDailySummary(projectId: string, localDate: string): Promise<ProjectDailySummary | undefined> {
+    return this.getAnalyticsRecord(dailySummaryKey(projectId, localDate));
+  }
+
+  private getAnalyticsRecord<T>(key: string): Promise<T | undefined> {
+    return this.enqueue(async () => {
+      const db = await this.getDatabase();
+      const transaction = db.transaction('analytics', 'readonly');
+      const done = transactionDone(transaction);
+      const value = await idbRequest<T | undefined>(transaction.objectStore('analytics').get(key));
+      await done;
+      return value;
+    });
+  }
+
   getProjectTasks(projectId: string): Promise<string> {
     return this.enqueue(async () => {
       const db = await this.getDatabase();
@@ -112,12 +223,14 @@ export class ProjectStorageService {
 
   createProject(project: Project): Promise<void> {
     const copy = { ...project };
-    return this.write(['projects', 'lists', 'metadata'], async (transaction) => {
+    return this.write(['projects', 'lists', 'metadata', 'analytics'], async (transaction) => {
       const store = transaction.objectStore('projects');
       const position = await idbRequest(store.count());
       const [id] = await this.reserveTaskIds(transaction, 1);
       store.add({ ...copy, position });
-      transaction.objectStore('lists').add({ projectId: copy.id, tasks: stringifyTasks([createEmptyTask(id)]) });
+      const tasks = stringifyTasks([createEmptyTask(id)]);
+      transaction.objectStore('lists').add({ projectId: copy.id, tasks });
+      await this.ensureProjectBaseline(transaction, copy.id, tasks);
     });
   }
 
@@ -195,6 +308,7 @@ export class ProjectStorageService {
     return this.write([...projectStoreNames], async (transaction) => {
       this.writeBackup(transaction, copy);
       await this.normalizeStoredTaskIds(transaction);
+      await this.ensureTrackingBaselines(transaction);
     });
   }
 
@@ -266,11 +380,11 @@ export class ProjectStorageService {
       || !projects.filter((project) => !project.archived).every((project) => typeof tasks[project.id] === 'string')
       || metadata['initialized'] !== true
       || !this.isId(metadata['nextTaskId']) || !this.isId(metadata['nextEventId'])) return invalid();
-    if (!events.every((event) => this.isRecord(event) && this.isId(event['id'])
-      && typeof event['projectId'] === 'string' && ids.has(event['projectId'])
-      && typeof event['localDate'] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event['localDate']))
+    if (!events.every((event) => isTaskActivity(event) && ids.has(event.projectId))
       || new Set(events.map((event) => event.id)).size !== events.length
       || events.some((event) => event.id >= (metadata['nextEventId'] as number))) return invalid();
+    if (!Object.entries(analytics).every(([key, record]) => !key.startsWith('baseline:')
+      || (isTrackingBaseline(record) && ids.has(record.projectId) && key === baselineKey(record.projectId)))) return invalid();
     return value as unknown as ProjectStorageBackup;
   }
 

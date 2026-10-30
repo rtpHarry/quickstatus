@@ -1,6 +1,7 @@
 import { openProjectDatabase, projectDatabaseName } from './project-storage.database';
 import { ProjectStorageService } from './project-storage.service';
 import { createEmptyTask, parseTasksString, stringifyTasks } from '../ui/task-list/task-list.utils';
+import { TaskActivityDraft, taskFacts } from '../analytics/task-activity.types';
 
 /** Real browser IndexedDB checks; no Angular fixture or application build needed. */
 describe('ProjectStorageService IndexedDB migration and restore', () => {
@@ -57,7 +58,9 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     backup.tasks[id] = '✅ snapshot [id:1]';
     backup.metadata['nextTaskId'] = 42;
     backup.metadata['nextEventId'] = 2;
-    backup.events = [{ id: 1, projectId: 'archive', localDate: '2026-10-30', type: 'test' }];
+    backup.events = [{ schemaVersion: 1, id: 1, taskId: 2, projectId: 'archive',
+      localDate: '2026-10-30', timestamp: '2026-10-30T12:00:00.000Z', type: 'deleted', source: 'normal',
+      before: taskFacts(createEmptyTask(2)), after: null }];
     backup.analytics['baseline'] = { projectId: id, tracked: true };
     await service.restoreBackup(backup);
     const exported = await service.exportBackupText();
@@ -169,6 +172,64 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     } });
     expect(parseTasksString(await service.getProjectTasks('b')).map((task) => task.id)).toEqual([101, 102]);
     expect((await service.allocateTaskIds(1))[0]).toBe(103);
+  });
+
+  it('[activity] captures the tracking baseline once, without synthetic events', async () => {
+    localStorage.setItem('taskList:projects', JSON.stringify([{ id: 'one', name: 'One' }]));
+    localStorage.setItem('taskList:one', '✅ existing complete [created:2026/10/01]');
+    await service.initialize();
+    const baseline = await service.getTrackingBaseline('one');
+    expect(baseline?.tasks[0].facts).toEqual({
+      status: '✅', hasText: true, sectionHeading: false, created: '2026/10/01',
+    });
+    expect(JSON.stringify(baseline)).not.toContain('existing complete');
+    await service.initialize();
+    expect(await service.getTrackingBaseline('one')).toEqual(baseline);
+    expect(await service.getTaskActivity('one')).toEqual([]);
+  });
+
+  it('[activity] saves task, event and counter together and publishes only durable activity', async () => {
+    const initial = await service.initialize();
+    const projectId = initial.projects[0].id;
+    const task = parseTasksString(initial.tasks[projectId])[0];
+    const after = { ...task, text: 'new task' };
+    const draft: TaskActivityDraft = {
+      taskId: task.id!, type: 'entered', source: 'normal', before: taskFacts(task), after: taskFacts(after),
+    };
+    let committed = 0;
+    const subscription = service.committedActivity$.subscribe(() => committed++);
+    try {
+      const result = service.commitTaskActivity({ projectId, tasks: stringifyTasks([after]), events: [draft] });
+      expect(committed).toBe(0);
+      const [event] = await result;
+      expect(committed).toBe(1);
+      expect(event.id).toBe(1);
+      expect((await service.exportBackup()).metadata['nextEventId']).toBe(2);
+      expect(await service.getProjectTasks(projectId)).toBe(stringifyTasks([after]));
+      expect(await service.getTaskActivity(projectId, event.localDate, event.localDate)).toEqual([event]);
+      expect(await service.getTaskActivity('another-project')).toEqual([]);
+      expect(JSON.stringify(event)).not.toContain('new task');
+    } finally { subscription.unsubscribe(); }
+  });
+
+  it('[activity] aborts task, event, counter and projection writes without a notification', async () => {
+    const initial = await service.initialize();
+    const projectId = initial.projects[0].id;
+    const task = parseTasksString(initial.tasks[projectId])[0];
+    const before = await service.exportBackup();
+    let committed = 0;
+    const subscription = service.committedActivity$.subscribe(() => committed++);
+    try {
+      await expectAsync(service.commitTaskActivity({
+        projectId, tasks: stringifyTasks([{ ...task, text: 'must roll back' }]),
+        events: [{ taskId: task.id!, type: 'entered', source: 'normal',
+          before: taskFacts(task), after: taskFacts({ ...task, text: 'must roll back' }) }],
+        // Fail after list, event and counter writes have been queued.
+        projection: { schemaVersion: 1, projectId: 'wrong-project', lastEventId: 1, tasks: {} },
+      })).toBeRejected();
+      expect(await service.exportBackup()).toEqual(before);
+      expect(committed).toBe(0);
+    } finally { subscription.unsubscribe(); }
   });
 });
 
