@@ -12,8 +12,20 @@
   width: 100%;
 }
 
-ion-footer ion-buttons {
+.footer-content {
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
+
+  app-project-stats-bar {
+    flex: 1 1 28rem;
+    min-width: 0;
+  }
+
+  ion-buttons {
+    flex-wrap: wrap;
+    margin-left: auto;
+  }
 }
 
 .undo-button-hidden {

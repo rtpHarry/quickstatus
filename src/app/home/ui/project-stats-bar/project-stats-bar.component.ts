@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
-import { IonToolbar } from '@ionic/angular/standalone';
 import { ProjectDailySummary } from '../../analytics/task-activity.types';
 
 @Component({
@@ -8,7 +7,6 @@ import { ProjectDailySummary } from '../../analytics/task-activity.types';
   styleUrls: ['./project-stats-bar.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
-  imports: [IonToolbar],
 })
 export class ProjectStatsBarComponent {
   @Input() summary: ProjectDailySummary | null | undefined;
