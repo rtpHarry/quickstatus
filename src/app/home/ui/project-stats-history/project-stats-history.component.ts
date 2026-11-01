@@ -5,6 +5,7 @@ import { ProjectStorageService } from '../../data/project-storage.service';
 import { baselineProjection, closingSummary } from '../../analytics/project-metrics';
 import { formatHistoryDate, historyRows, shiftDate, signedChange, HistoryRow } from './stats-history';
 import { localActivityDate } from '../../analytics/task-activity.types';
+import { sampleStatsHistory } from './sample-stats-history';
 
 @Component({
   selector: 'app-project-stats-history',
@@ -21,6 +22,7 @@ export class ProjectStatsHistoryComponent {
   historyLoading = false;
   historyError = false;
   canLoadOlder = false;
+  showingSample = false;
   private historyProjectId = '';
   private days = 30;
   readonly formatDate = formatHistoryDate;
@@ -56,9 +58,25 @@ export class ProjectStatsHistoryComponent {
     await this.loadHistory();
   }
 
+  showSampleWeek() {
+    if (this.historyLoading) {
+      return;
+    }
+    this.rows = sampleStatsHistory(this.historyProjectId);
+    this.showingSample = true;
+    this.historyError = false;
+    this.canLoadOlder = false;
+    this.changeDetector.markForCheck();
+  }
+
   async loadHistory(older = false) {
     if (this.historyLoading) {
       return;
+    }
+    if (this.showingSample) {
+      this.rows = [];
+      this.days = 30;
+      this.showingSample = false;
     }
     this.historyLoading = true;
     this.historyError = false;
