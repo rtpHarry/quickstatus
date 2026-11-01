@@ -25,21 +25,3 @@ button.project-stats {
   &:focus-visible { outline: 2px solid var(--ion-color-primary); outline-offset: -2px; }
   &:disabled { cursor: default; }
 }
-
-ion-modal { --width: 800px; }
-.period, .history-note { color: var(--ion-color-medium-shade); font-size: 13px; line-height: 1.5; }
-.history-summary { line-height: 1.6; }
-.history-table { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td {
-  padding: 12px;
-  text-align: right;
-  white-space: nowrap;
-  border-bottom: 1px solid var(--ion-color-light-shade);
-  font-variant-numeric: tabular-nums;
-}
-th:first-child { text-align: left; }
-tbody th { font-weight: normal; }
-thead { background: var(--ion-color-light); }
-.backlog-down { color: var(--ion-color-success-shade); }
-.backlog-up { color: var(--ion-color-danger-shade); }
