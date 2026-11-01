@@ -43,7 +43,7 @@ export class ProjectStatsHistoryComponent {
       return '';
     }
     const change = this.rows.reduce((total, row) => total + row.change, 0);
-    return change === 0 ? 'Backlog unchanged' : `Backlog ${change > 0 ? 'reduced' : 'increased'} by ${Math.abs(change)}`;
+    return change === 0 ? 'Backlog unchanged' : `Backlog ${change < 0 ? 'reduced' : 'increased'} by ${Math.abs(change)}`;
   }
 
   async open(projectId: string) {

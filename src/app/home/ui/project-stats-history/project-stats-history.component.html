@@ -48,7 +48,7 @@
                   <td>{{ row.start }}</td>
                   <td>{{ row.remaining }}</td>
                   <td>
-                    <span [class.backlog-down]="row.change > 0" [class.backlog-up]="row.change < 0">
+                    <span [class.backlog-down]="row.change < 0" [class.backlog-up]="row.change > 0">
                       {{ signedChange(row.change) }}
                     </span>
                   </td>
@@ -60,7 +60,8 @@
         <p class="history-note">Start and End count unfinished tasks. Today's End is the current backlog.
           New means created that day; Existing means created before that day.
           New is red when more new tasks were completed than existing tasks.
-          Change is Start minus End: positive means a smaller backlog, including dropped tasks.
+          Change is End minus Start: negative (green) means fewer unfinished tasks, including dropped tasks;
+          positive (red) means more unfinished tasks.
           Deleting an unfinished task removes its Added credit; earlier completion credits remain.
           Reopening cancels only its same-day completion.</p>
         @if (rows[rows.length - 1].baselineDay) {

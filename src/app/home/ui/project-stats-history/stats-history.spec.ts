@@ -21,7 +21,7 @@ describe('stats history', () => {
   it('uses the preceding day outside the displayed range and sorts newest first', () => {
     const rows = historyRows([day('2026-11-03', 8), day('2026-11-01', 12), day('2026-11-02', 10)], '2026-11-02', 15);
     expect(rows.map(row => [row.localDate, row.start, row.remaining, row.change])).toEqual([
-      ['2026-11-03', 10, 8, 2], ['2026-11-02', 12, 10, 2],
+      ['2026-11-03', 10, 8, -2], ['2026-11-02', 12, 10, -2],
     ]);
   });
 
@@ -30,15 +30,15 @@ describe('stats history', () => {
       { ...day('2026-11-01', 50), created: 3, completed: 8 },
       { ...day('2026-11-02', 20), created: 9, completed: 4 },
     ], '2026-11-01', 50);
-    expect(rows.map(row => row.change)).toEqual([30, 0]);
+    expect(rows.map(row => row.change)).toEqual([-30, 0]);
   });
 
   it('uses the baseline opening count, including changes unrelated to completion', () => {
     const rows = historyRows([day('2026-11-01', 7), day('2026-11-02', 9)], '2026-10-01', 10, '2026-11-01');
     expect(rows[1].start).toBe(10);
     expect(rows[1].baselineDay).toBeTrue();
-    expect(rows[1].change).toBe(3);
-    expect(rows[0].change).toBe(-2);
+    expect(rows[1].change).toBe(-3);
+    expect(rows[0].change).toBe(2);
     expect(signedChange(2)).toBe('+2');
     expect(signedChange(-3)).toBe('−3');
     expect(signedChange(0)).toBe('0');
