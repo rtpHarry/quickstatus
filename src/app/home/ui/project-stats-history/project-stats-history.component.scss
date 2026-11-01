@@ -5,13 +5,24 @@ ion-modal { --width: 800px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td {
   padding: 12px;
-  text-align: right;
+  text-align: center;
   white-space: nowrap;
   border-bottom: 1px solid var(--ion-color-light-shade);
   font-variant-numeric: tabular-nums;
 }
 th:first-child { text-align: left; }
+th:nth-child(2),
+td:nth-child(2),
+th:nth-child(3),
+td:nth-child(3),
+th:nth-child(6),
+td:nth-child(6) {
+  border-left: 1px solid var(--ion-color-light-shade);
+}
 tbody th { font-weight: normal; }
 thead { background: var(--ion-color-light); }
 .backlog-down { color: var(--ion-color-success-shade); }
 .backlog-up { color: var(--ion-color-danger-shade); }
+.new-work-heavy {
+  color: var(--ion-color-danger-shade);
+}
