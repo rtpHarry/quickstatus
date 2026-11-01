@@ -39,9 +39,9 @@ export interface TaskTrackingBaseline {
 export interface ProjectTaskProjection {
   schemaVersion: 1;
   projectId: string;
-  reducerVersion: 1;
+  reducerVersion: 2;
   lastEventId: number;
-  tasks: Record<string, { facts: TaskFacts; arrivalDate: string | null; deleted: boolean }>;
+  tasks: Record<string, { facts: TaskFacts; arrivalDate: string | null; deleted: boolean; dropped?: boolean }>;
 }
 
 export interface ProjectDailySummary {

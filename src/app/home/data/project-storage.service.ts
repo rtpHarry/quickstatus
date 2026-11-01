@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
 import { taskRemovalEvents } from '../analytics/task-actions';
-import { applyTaskActivity, closingSummary, dailyMetrics, metricDateRange, rebuildProjectMetrics } from '../analytics/project-metrics';
+import { applyTaskActivity, dailyMetrics, metricDateRange, rebuildProjectMetrics } from '../analytics/project-metrics';
 import { baselineKey, CommittedProjectActivity, dailySummaryKey, isTaskActivity, isTrackingBaseline, localActivityDate, ProjectActivityMutation, ProjectDailySummary, ProjectTaskProjection, projectionKey, TaskActivity, taskFacts, TaskTrackingBaseline } from '../analytics/task-activity.types';
 import { createEmptyTask, normalizeTaskListIds, parseTasksString, stringifyTasks } from '../ui/task-list/task-list.utils';
 import { idbRequest, openProjectDatabase, projectStoreNames, transactionDone } from './project-storage.database';
@@ -129,7 +129,7 @@ export class ProjectStorageService {
       : await idbRequest<TaskTrackingBaseline[]>(analytics.getAll(IDBKeyRange.bound('baseline:', 'baseline:\uffff')));
     for (const baseline of baselines) {
       const existing = await idbRequest<ProjectTaskProjection | undefined>(analytics.get(projectionKey(baseline.projectId)));
-      if (!force && existing?.reducerVersion === 1) continue;
+      if (!force && existing?.reducerVersion === 2) continue;
       const events = await idbRequest<TaskActivity[]>(transaction.objectStore('events').index('projectDate')
         .getAll(IDBKeyRange.bound([baseline.projectId, ''], [baseline.projectId, '\uffff'])));
       const rebuilt = rebuildProjectMetrics(baseline, events);
@@ -201,11 +201,11 @@ export class ProjectStorageService {
     const analytics = transaction.objectStore('analytics');
     // Callers supply facts, never derived totals. Derivation shares this transaction.
     const projection = await idbRequest<ProjectTaskProjection>(analytics.get(projectionKey(copy.projectId)));
-    const summaries: ProjectDailySummary[] = [];
-    for (const date of new Set(events.map((event) => event.localDate))) {
-      summaries.push(await idbRequest<ProjectDailySummary | undefined>(analytics.get(dailySummaryKey(copy.projectId, date)))
-        ?? closingSummary(projection, date));
-    }
+    // Drops and undo can revise an addition on an earlier date. Retain all identity
+    // credits so these adjustments share the same atomic transaction as the list.
+    const prefix = `daily:${copy.projectId}:`;
+    const summaries = await idbRequest<ProjectDailySummary[]>(analytics
+      .getAll(IDBKeyRange.bound(prefix, prefix + '\uffff')));
     const reduced = applyTaskActivity(projection, events, summaries);
     analytics.put(reduced.projection, projectionKey(copy.projectId));
     reduced.summaries.forEach((day) => analytics.put(day, dailySummaryKey(copy.projectId, day.localDate)));

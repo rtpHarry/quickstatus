@@ -55,8 +55,9 @@
         </div>
         <p class="history-note">Start and End count unfinished tasks. Today's End is the current backlog.
           New means created that day; Existing means created before that day.
-          Change is Done minus Added: positive means more completed than added.
-          Deleting a task earns no completion; reopening cancels its same-day completion.</p>
+          Change is Start minus End: positive means a smaller backlog, including dropped tasks.
+          Deleting an unfinished task removes its Added credit; earlier completion credits remain.
+          Reopening cancels only its same-day completion.</p>
         @if (rows[rows.length - 1].baselineDay) {
           <p class="history-note">* Tracking began on this day. Start is the backlog when tracking began.</p>
         }

@@ -85,6 +85,34 @@ describe('project task metrics', () => {
     expect(incremental.summaries[1].closingTotal).toBe(0);
   });
 
+  it('drops additions across days without rewriting backlog snapshots, and undo restores them', () => {
+    const initial = baseline();
+    const events = [event(1, 1, 'entered', null, facts()),
+      event(2, 1, 'deleted', facts(), null, '2026-10-03'),
+      event(3, 1, 'restored', null, facts(), '2026-10-04')];
+    const dropped = rebuildProjectMetrics(initial, events.slice(0, 2));
+    expect(dropped.summaries[0]).toEqual(jasmine.objectContaining({ created: 0, remaining: 1, completed: 0 }));
+    expect(dailyMetrics('one', '2026-10-02', dropped.summaries)?.remaining).toBe(1);
+    expect(dropped.summaries[1].remaining).toBe(0);
+    const undone = applyTaskActivity(dropped.projection, events.slice(2), dropped.summaries);
+    expect(undone).toEqual(rebuildProjectMetrics(initial, events));
+    expect(undone.summaries[0].created).toBe(1);
+    expect(undone.summaries[2]).toEqual(jasmine.objectContaining({ created: 0, completed: 0, remaining: 1 }));
+  });
+
+  it('preserves earlier completions when reopened then dropped, but cancels same-day credits', () => {
+    const initial = baseline();
+    const events = [event(1, 1, 'entered', null, facts()),
+      event(2, 1, 'status-changed', facts(), facts('✅')),
+      event(3, 1, 'status-changed', facts('✅'), facts(), '2026-10-03'),
+      event(4, 1, 'deleted', facts(), null, '2026-10-03')];
+    const result = rebuildProjectMetrics(initial, events);
+    expect(result.summaries[0]).toEqual(jasmine.objectContaining({ created: 0, completed: 1, remaining: 0 }));
+    expect(result.summaries[1]).toEqual(jasmine.objectContaining({ created: 0, completed: 0, remaining: 0 }));
+    const sameDay = rebuildProjectMetrics(initial, events.map(action => ({ ...action, localDate: '2026-10-01' })));
+    expect(sameDay.summaries[0]).toEqual(jasmine.objectContaining({ created: 0, completed: 0, remaining: 0 }));
+  });
+
   it('keeps event local dates when UTC ordering spans another calendar day', () => {
     const action = { ...event(1, 1, 'entered', null, facts(), '2026-10-02'), timestamp: '2026-10-01T16:30:00Z' };
     const result = rebuildProjectMetrics(baseline(), [action]);

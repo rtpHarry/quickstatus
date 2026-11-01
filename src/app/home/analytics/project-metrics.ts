@@ -15,7 +15,7 @@ export function baselineProjection(baseline: TaskTrackingBaseline): ProjectTaskP
     facts: { ...facts }, arrivalDate: creationDate(facts.created), deleted: false,
   });
   return {
-    schemaVersion: 1, reducerVersion: 1, projectId: baseline.projectId, lastEventId: 0,
+    schemaVersion: 1, reducerVersion: 2, projectId: baseline.projectId, lastEventId: 0,
     tasks,
   };
 }
@@ -58,6 +58,12 @@ export function applyTaskActivity(
         day.completionCredits = day.completionCredits.filter((credit) => credit.taskId !== event.taskId);
       }
     }
+    // Keep identity credits for undo; a drop excludes additions, never past completions.
+    if (event.type === 'deleted') {
+      task.dropped = !!event.before && eligible(event.before) && event.before.status !== '✅';
+    } else if (event.type === 'restored') {
+      task.dropped = false;
+    }
     if (event.after) task.facts = { ...event.after };
     task.deleted = event.after === null;
     projection.tasks[event.taskId] = task;
@@ -71,6 +77,10 @@ export function applyTaskActivity(
       remaining: closing.remaining, closingCompleted: closing.closingCompleted, closingTotal: closing.closingTotal,
     });
     days.set(event.localDate, day);
+  }
+  // Historical opening/closing snapshots stay untouched when additions are excluded.
+  for (const day of days.values()) {
+    day.created = day.createdTaskIds.filter(id => !projection.tasks[id]?.dropped).length;
   }
   return { projection, summaries: [...days.values()].sort((a, b) => a.localDate.localeCompare(b.localDate)) };
 }

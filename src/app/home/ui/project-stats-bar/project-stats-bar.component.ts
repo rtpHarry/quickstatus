@@ -44,7 +44,7 @@ export class ProjectStatsBarComponent {
   get backlogSummary(): string {
     if (!this.rows.length) return '';
     const change = this.rows.reduce((total, row) => total + row.change, 0);
-    return change === 0 ? 'Added and completed are balanced' : `Net progress ${signedChange(change)}`;
+    return change === 0 ? 'Backlog unchanged' : `Backlog ${change > 0 ? 'reduced' : 'increased'} by ${Math.abs(change)}`;
   }
 
   async openHistory() {

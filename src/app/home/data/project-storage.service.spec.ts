@@ -73,6 +73,46 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     expect((await service.initialize()).projects.length).toBe(1);
   });
 
+  it('rebuilds older metrics and persists cross-day drop/undo adjustments', async () => {
+    const initial = await service.initialize();
+    const projectId = initial.projects[0].id;
+    const task = { ...createEmptyTask(1), text: 'Temporary note' };
+    const facts = taskFacts(task);
+    const backup = await service.exportBackup();
+    backup.tasks[projectId] = stringifyTasks([task]);
+    backup.metadata['nextTaskId'] = 2;
+    backup.metadata['nextEventId'] = 2;
+    backup.analytics[`baseline:${projectId}`] = {
+      schemaVersion: 1, projectId, timestamp: '2026-01-01T12:00:00Z', localDate: '2026-01-01', tasks: [],
+    };
+    backup.events = [{ schemaVersion: 1, id: 1, taskId: 1, projectId,
+      timestamp: '2026-01-01T12:00:00Z', localDate: '2026-01-01', type: 'entered',
+      source: 'normal', before: null, after: facts }];
+    await service.restoreBackup(backup);
+    // Simulate a cache written by the previous reducer, then reopen the store.
+    const db = await (service as unknown as { database: Promise<IDBDatabase> }).database;
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('analytics', 'readwrite');
+      const store = tx.objectStore('analytics');
+      const request = store.get(`projection:${projectId}`);
+      request.onsuccess = () => store.put({ ...request.result, reducerVersion: 1 }, `projection:${projectId}`);
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error);
+    });
+    await service.initialize();
+    expect((await service.getTaskProjection(projectId))?.reducerVersion).toBe(2);
+    await service.commitTaskActivity({ projectId, tasks: '', events: [{ taskId: 1,
+      type: 'deleted', source: 'normal', before: facts, after: null }] });
+    expect(await service.getDailySummary(projectId, '2026-01-01')).toEqual(jasmine.objectContaining({ created: 0, remaining: 1 }));
+    const dropped = await service.exportBackup();
+    await service.restoreBackup(dropped);
+    expect(await service.getDailySummary(projectId, '2026-01-01')).toEqual(jasmine.objectContaining({ created: 0, remaining: 1 }));
+    await service.commitTaskActivity({ projectId, tasks: stringifyTasks([task]), events: [{ taskId: 1,
+      type: 'restored', source: 'undo', before: null, after: facts }] });
+    expect(await service.getDailySummary(projectId, '2026-01-01')).toEqual(jasmine.objectContaining({ created: 1, remaining: 1 }));
+    expect(await service.getDailySummary(projectId, localActivityDate())).toEqual(jasmine.objectContaining({ created: 0, completed: 0, remaining: 1 }));
+  });
+
   it('rejects invalid snapshots and rolls back a write-time failure', async () => {
     await service.initialize();
     const before = await service.exportBackup();

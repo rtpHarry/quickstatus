@@ -31,6 +31,6 @@ export function historyRows(summaries: ProjectDailySummary[], from: string, open
   const ordered = [...summaries].sort((a, b) => a.localDate.localeCompare(b.localDate));
   return ordered.map((day, index) => {
     const start = index ? ordered[index - 1].remaining : opening;
-    return { ...day, start, change: day.completed - day.created, baselineDay: day.localDate === baselineDate };
+    return { ...day, start, change: start - day.remaining, baselineDay: day.localDate === baselineDate };
   }).filter(day => day.localDate >= from).reverse();
 }
