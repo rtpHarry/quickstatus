@@ -1,4 +1,5 @@
-<div class="project-stats" role="status" aria-live="polite" aria-atomic="true">
+<button type="button" class="project-stats" [disabled]="!hasProject || loading"
+  (click)="openHistory()" aria-haspopup="dialog" aria-label="Open stats history">
   @if (loading) {
     <span>Loading today's stats…</span>
   } @else if (!hasProject) {
@@ -16,4 +17,61 @@
   } @else {
     <span>Loading today's stats…</span>
   }
-</div>
+</button>
+
+<ion-modal #historyModal aria-label="Stats history">
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>Stats history</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="historyModal.dismiss()">Close</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      @if (rows.length) {
+        <p class="period">{{ formatDate(rows[rows.length - 1].localDate) }} – {{ formatDate(rows[0].localDate) }}</p>
+        <p class="history-summary"><strong>{{ backlogSummary }}</strong> · {{ totals.added }} added ·
+          {{ totals.done }} completed · {{ totals.existing }} existing tasks completed</p>
+        <div class="history-table" tabindex="0" role="region" aria-label="Daily stats history">
+          <table>
+            <thead><tr>
+              <th scope="col">Date</th><th scope="col">Added</th>
+              <th scope="col">Done / New / Existing</th><th scope="col">Start / End / Change</th>
+            </tr></thead>
+            <tbody>
+              @for (row of rows; track row.localDate) {
+                <tr>
+                  <th scope="row">{{ formatDate(row.localDate) }}{{ row.baselineDay ? '*' : '' }}</th>
+                  <td>{{ row.created }}</td>
+                  <td>{{ row.completed }} / {{ row.completedNew }} / {{ row.completedExisting }}</td>
+                  <td>{{ row.start }} / {{ row.remaining }} / <span
+                    [class.backlog-down]="row.change > 0" [class.backlog-up]="row.change < 0">{{ signedChange(row.change) }}</span></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="history-note">Start and End count unfinished tasks. Today's End is the current backlog.
+          New means created that day; Existing means created before that day.
+          Change is Done minus Added: positive means more completed than added.
+          Deleting a task earns no completion; reopening cancels its same-day completion.</p>
+        @if (rows[rows.length - 1].baselineDay) {
+          <p class="history-note">* Tracking began on this day. Start is the backlog when tracking began.</p>
+        }
+      }
+      @if (historyLoading) {
+        <p role="status">Loading history…</p>
+      } @else if (historyError) {
+        <p role="alert">History could not be loaded.</p>
+        <ion-button fill="clear" (click)="loadHistory()">Retry</ion-button>
+      } @else if (!rows.length) {
+        <p>No history available yet.</p>
+      }
+      @if (canLoadOlder && !historyError) {
+        <ion-button fill="clear" [disabled]="historyLoading" (click)="loadHistory(true)">Load older</ion-button>
+      }
+    </ion-content>
+  </ng-template>
+</ion-modal>

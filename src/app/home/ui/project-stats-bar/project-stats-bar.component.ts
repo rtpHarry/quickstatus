@@ -1,5 +1,10 @@
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
-import { ProjectDailySummary } from '../../analytics/task-activity.types';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, ViewChild } from '@angular/core';
+import { IonButton, IonButtons, IonContent, IonHeader, IonModal, IonTitle, IonToolbar } from '@ionic/angular/standalone';
+import { ProjectAnalyticsService } from '../../analytics/project-analytics.service';
+import { ProjectStorageService } from '../../data/project-storage.service';
+import { baselineProjection, closingSummary } from '../../analytics/project-metrics';
+import { formatHistoryDate, historyRows, shiftDate, signedChange, HistoryRow } from './stats-history';
+import { localActivityDate, ProjectDailySummary } from '../../analytics/task-activity.types';
 
 @Component({
   selector: 'app-project-stats-bar',
@@ -7,10 +12,69 @@ import { ProjectDailySummary } from '../../analytics/task-activity.types';
   styleUrls: ['./project-stats-bar.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
+  imports: [IonButton, IonButtons, IonContent, IonHeader, IonModal, IonTitle, IonToolbar],
 })
 export class ProjectStatsBarComponent {
   @Input() summary: ProjectDailySummary | null | undefined;
   @Input() loading = false;
   @Input() error: unknown;
   @Input() hasProject = false;
+  @Input() projectId = '';
+  @ViewChild(IonModal) modal?: IonModal;
+
+  rows: HistoryRow[] = [];
+  historyLoading = false;
+  historyError = false;
+  canLoadOlder = false;
+  private historyProjectId = '';
+  private days = 30;
+  readonly formatDate = formatHistoryDate;
+  readonly signedChange = signedChange;
+
+  constructor(private analytics: ProjectAnalyticsService, private storage: ProjectStorageService,
+    private changeDetector: ChangeDetectorRef) {}
+
+  get totals() {
+    return this.rows.reduce((total, row) => ({
+      added: total.added + row.created, done: total.done + row.completed,
+      existing: total.existing + row.completedExisting,
+    }), { added: 0, done: 0, existing: 0 });
+  }
+
+  get backlogSummary(): string {
+    if (!this.rows.length) return '';
+    const change = this.rows.reduce((total, row) => total + row.change, 0);
+    return change === 0 ? 'Added and completed are balanced' : `Net progress ${signedChange(change)}`;
+  }
+
+  async openHistory() {
+    if (!this.projectId || this.loading) return;
+    this.historyProjectId = this.projectId;
+    this.days = 30;
+    this.rows = [];
+    void this.modal?.present();
+    await this.loadHistory();
+  }
+
+  async loadHistory(older = false) {
+    if (this.historyLoading) return;
+    this.historyLoading = true;
+    this.historyError = false;
+    const days = this.days + (older ? 30 : 0);
+    try {
+      const today = localActivityDate();
+      const from = shiftDate(today, 1 - days);
+      const baseline = await this.storage.getTrackingBaseline(this.historyProjectId);
+      const summaries = await this.analytics.history(this.historyProjectId, shiftDate(from, -1), today);
+      const opening = baseline ? closingSummary(baselineProjection(baseline), baseline.localDate).remaining : 0;
+      this.rows = historyRows(summaries, from, opening, baseline?.localDate);
+      this.canLoadOlder = !!baseline && baseline.localDate < from;
+      this.days = days;
+    } catch {
+      this.historyError = true;
+    } finally {
+      this.historyLoading = false;
+      this.changeDetector.markForCheck();
+    }
+  }
 }

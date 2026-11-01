@@ -127,6 +127,7 @@
         [loading]="storageBusy"
         [error]="analytics.error$ | async"
         [hasProject]="!!selectedProjectId"
+        [projectId]="selectedProjectId"
       ></app-project-stats-bar>
       <ion-buttons>
         <ion-button
