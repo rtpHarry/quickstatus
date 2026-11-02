@@ -6,10 +6,12 @@ ionic serve
 
 Bump version in package.json
 
-chore(release): deploy vX.X.X
+Commit:
 
-npm run build
+chore(release): deploy vX.X.X
 
 Then deploy to github page using:
 
 npm run deploy
+
+A pre deploy hook will automatically run `npm run build` before deployment.
