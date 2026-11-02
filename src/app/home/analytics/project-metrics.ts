@@ -15,7 +15,7 @@ export function baselineProjection(baseline: TaskTrackingBaseline): ProjectTaskP
     facts: { ...facts }, arrivalDate: creationDate(facts.created), deleted: false,
   });
   return {
-    schemaVersion: 1, reducerVersion: 2, projectId: baseline.projectId, lastEventId: 0,
+    schemaVersion: 1, reducerVersion: 3, projectId: baseline.projectId, lastEventId: 0,
     tasks,
   };
 }
@@ -59,9 +59,11 @@ export function applyTaskActivity(
       }
     }
     // Keep identity credits for undo; a drop excludes additions, never past completions.
-    if (event.type === 'deleted') {
-      task.dropped = !!event.before && eligible(event.before) && event.before.status !== '✅';
-    } else if (event.type === 'restored') {
+    const leavesTaskList = event.type === 'deleted'
+      || (event.type === 'membership-changed' && event.after && !eligible(event.after));
+    if (leavesTaskList && event.before && eligible(event.before)) {
+      task.dropped = event.before.status !== '✅';
+    } else if ((event.type === 'restored' || event.type === 'entered') && event.after && eligible(event.after)) {
       task.dropped = false;
     }
     if (event.after) task.facts = { ...event.after };

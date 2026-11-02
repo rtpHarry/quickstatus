@@ -129,7 +129,7 @@ export class ProjectStorageService {
       : await idbRequest<TaskTrackingBaseline[]>(analytics.getAll(IDBKeyRange.bound('baseline:', 'baseline:\uffff')));
     for (const baseline of baselines) {
       const existing = await idbRequest<ProjectTaskProjection | undefined>(analytics.get(projectionKey(baseline.projectId)));
-      if (!force && existing?.reducerVersion === 2) continue;
+      if (!force && existing?.reducerVersion === 3) continue;
       const events = await idbRequest<TaskActivity[]>(transaction.objectStore('events').index('projectDate')
         .getAll(IDBKeyRange.bound([baseline.projectId, ''], [baseline.projectId, '\uffff'])));
       const rebuilt = rebuildProjectMetrics(baseline, events);

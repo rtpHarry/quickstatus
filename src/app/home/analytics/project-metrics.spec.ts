@@ -59,6 +59,39 @@ describe('project task metrics', () => {
     expect(result.summaries[0]).toEqual(jasmine.objectContaining({ created: 1, completed: 1, completedNew: 1 }));
   });
 
+  for (const kind of ['blank', 'heading']) {
+    it(`removes creation credit when an unfinished task becomes a ${kind}, and restores it on reentry`, () => {
+      const excluded = facts('❌', kind === 'blank' ? { hasText: false } : { sectionHeading: true });
+      const events = [event(1, 1, 'entered', null, facts()),
+        event(2, 1, 'membership-changed', facts(), excluded),
+        event(3, 1, 'deleted', excluded, null),
+        event(4, 1, 'restored', null, excluded),
+        event(5, 1, 'entered', excluded, facts())];
+      let result = rebuildProjectMetrics(baseline(), []);
+      const counts: number[][] = [];
+      for (const action of events) {
+        result = applyTaskActivity(result.projection, [action], result.summaries);
+        counts.push([result.summaries[0].created, result.summaries[0].remaining]);
+        expect(result).toEqual(rebuildProjectMetrics(baseline(), events.slice(0, action.id)));
+      }
+      expect(counts).toEqual([[1, 1], [0, 0], [0, 0], [0, 0], [1, 1]]);
+    });
+  }
+
+  it('excludes earlier additions after a later heading conversion without changing backlog snapshots', () => {
+    const result = rebuildProjectMetrics(baseline(), [event(1, 1, 'entered', null, facts()),
+      event(2, 1, 'membership-changed', facts(), facts('❌', { sectionHeading: true }), '2026-10-03')]);
+    expect(result.summaries[0]).toEqual(jasmine.objectContaining({ created: 0, remaining: 1 }));
+    expect(result.summaries[1]).toEqual(jasmine.objectContaining({ created: 0, remaining: 0 }));
+  });
+
+  it('preserves creation and completion credits when a completed task becomes a heading', () => {
+    const result = rebuildProjectMetrics(baseline(), [event(1, 1, 'entered', null, facts()),
+      event(2, 1, 'status-changed', facts(), facts('✅')),
+      event(3, 1, 'membership-changed', facts('✅'), facts('✅', { sectionHeading: true }))]);
+    expect(result.summaries[0]).toEqual(jasmine.objectContaining({ created: 1, completed: 1, remaining: 0 }));
+  });
+
   it('paste arrives completed without earning a completion, and project queries isolate data', () => {
     const result = rebuildProjectMetrics(baseline(), [{ ...event(1, 1, 'entered', null, facts('✅')), source: 'paste' }]);
     expect(result.summaries[0]).toEqual(jasmine.objectContaining({ created: 1, completed: 0, closingCompleted: 1 }));
