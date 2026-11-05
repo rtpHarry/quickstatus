@@ -6,6 +6,7 @@ import { baselineKey, CommittedProjectActivity, dailySummaryKey, isTaskActivity,
 import { createEmptyTask, normalizeTaskListIds, parseTasksString, stringifyTasks } from '../ui/task-list/task-list.utils';
 import { idbRequest, openProjectDatabase, projectStoreNames, transactionDone } from './project-storage.database';
 import { LegacyStorageBackup, Project, ProjectStorageBackup, ProjectStorageSnapshot, StoredProject } from './project-storage.types';
+import { upgradeTaskTagPrefixes } from './task-tag-upgrade';
 
 @Injectable({ providedIn: 'root' })
 export class ProjectStorageService {
@@ -49,6 +50,7 @@ export class ProjectStorageService {
           this.writeBackup(transaction, this.baselineBackup(snapshot));
         }
         await this.normalizeStoredTaskIds(transaction);
+        await this.upgradeStoredTaskTags(transaction);
         await this.ensureTrackingBaselines(transaction);
         await this.ensureProjectMetrics(transaction);
         await done;
@@ -66,6 +68,18 @@ export class ProjectStorageService {
       const random = (Math.random() * 16) | 0;
       return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
     });
+  }
+
+  /** Idempotent load-time scan also handles lists restored from older backups. */
+  private async upgradeStoredTaskTags(transaction: IDBTransaction): Promise<void> {
+    const lists = transaction.objectStore('lists');
+    const rows = await idbRequest<{ projectId: string; tasks: string }[]>(lists.getAll());
+    for (const row of rows) {
+      const tasks = upgradeTaskTagPrefixes(row.tasks);
+      if (tasks !== row.tasks) {
+        lists.put({ projectId: row.projectId, tasks });
+      }
+    }
   }
 
   /** Reservations commit before returning; gaps are intentional after cancelled actions. */
