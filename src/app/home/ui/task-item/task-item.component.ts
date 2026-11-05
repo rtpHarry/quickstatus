@@ -11,13 +11,12 @@ import {
   ViewChild,
 } from '@angular/core';
 import { Task, taskAgeInDays } from '../task-list/task-list.utils';
-import { FormsModule } from '@angular/forms';
+import { TaskTextEditorComponent } from '../task-text-editor/task-text-editor.component';
 import {
   IonButton,
   IonCol,
   IonGrid,
   IonIcon,
-  IonInput,
   IonItem,
   IonRow,
 } from '@ionic/angular/standalone';
@@ -34,18 +33,17 @@ import { lockClosedOutline, lockOpenOutline, textOutline } from 'ionicons/icons'
     IonButton,
     IonCol,
     CommonModule,
-    FormsModule,
+    TaskTextEditorComponent,
     IonGrid,
     IonIcon,
     IonRow,
     IonItem,
-    IonInput,
   ],
 })
 export class TaskItemComponent implements OnInit, OnDestroy {
   @Input() task!: Task;
   @Output() taskChange = new EventEmitter<Task>();
-  @ViewChild(IonInput) input!: IonInput;
+  @ViewChild(TaskTextEditorComponent) input!: TaskTextEditorComponent;
   private ageRefreshTimer?: ReturnType<typeof setInterval>;
 
   get ageBadge(): { text: string; label: string } | null {
@@ -86,10 +84,7 @@ export class TaskItemComponent implements OnInit, OnDestroy {
   }
 
   async focusInput(): Promise<void> {
-    // Angular can create the wrapper before Ionic renders its native input.
-    // setFocus() alone silently does nothing until that input exists.
-    await this.input.getInputElement();
-    await this.input.setFocus();
+    await this.input.focus();
   }
 
   private updateTask(change: Partial<Task>) {
@@ -131,7 +126,10 @@ export class TaskItemComponent implements OnInit, OnDestroy {
     const isEmpty = !this.task.text || this.task.text.trim() === '';
     const key = event.key.toLowerCase();
 
-    if (isCtrlPressed && key === 'p') {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.emitEnterKey();
+    } else if (isCtrlPressed && key === 'p') {
       event.preventDefault();
       this.togglePrivate();
     } else if (isCtrlPressed && key === 'h') {

@@ -10,6 +10,7 @@
  */
 
 /* Core CSS required for Ionic components to work properly */
+@import "@yaireo/tagify/dist/tagify.css";
 @import "@ionic/angular/css/core.css";
 
 /* Basic CSS for apps built with Ionic */
@@ -24,6 +25,35 @@
 @import "@ionic/angular/css/text-alignment.css";
 @import "@ionic/angular/css/text-transformation.css";
 @import "@ionic/angular/css/flex-utils.css";
+
+/* Tagify creates its editable DOM dynamically, outside Angular's style scoping. */
+app-task-text-editor .tagify {
+  --tags-border-color: transparent;
+  --tags-hover-border-color: transparent;
+  --tags-focus-border-color: var(--ion-color-primary);
+  --tag-bg: var(--ion-color-light);
+  --tag-hover: var(--ion-color-light-shade);
+  --tag-text-color: var(--ion-text-color);
+  --tag-remove-btn-color: var(--ion-text-color);
+  --placeholder-color: var(--ion-color-medium);
+  width: 100%;
+  color: var(--ion-text-color);
+  font: inherit;
+  min-height: 44px;
+}
+
+app-task-text-editor .tagify__input {
+  min-width: 0;
+  margin: 5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tagify__dropdown {
+  --tagify-dd-bg-color: var(--ion-background-color);
+  --tagify-dd-color-primary: var(--ion-color-primary);
+  --tagify-dd-text-color: var(--ion-text-color);
+}
 
 /**
  * Ionic Dark Mode

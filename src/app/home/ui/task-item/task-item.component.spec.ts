@@ -1,38 +1,21 @@
 import { TaskItemComponent } from './task-item.component';
 
-describe('Task item input focus', () => {
-  it('[focus] waits for Ionic to render the native input before focusing', async () => {
+describe('Task item editor shortcuts', () => {
+  it('delegates row focus to the editor', async () => {
     const component = new TaskItemComponent({} as never);
-    let finishRendering!: () => void;
-    const rendered = new Promise<void>((resolve) => {
-      finishRendering = resolve;
-    });
-    const nativeInput = {
-      focus: jasmine.createSpy('native input focus'),
-    };
-    let inputReady = false;
+    const focus = jasmine.createSpy('focus').and.resolveTo();
+    component.input = { focus } as never;
+    await component.focusInput();
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
 
-    component.input = {
-      getInputElement: async () => {
-        await rendered;
-        inputReady = true;
-        return nativeInput;
-      },
-      setFocus: async () => {
-        // Match Ionic's behavior: focus is a no-op before the native input exists.
-        if (inputReady) {
-          nativeInput.focus();
-        }
-      },
-    } as never;
-
-    const focusing = component.focusInput();
-    await Promise.resolve();
-    expect(nativeInput.focus).not.toHaveBeenCalled();
-
-    finishRendering();
-    await focusing;
-
-    expect(nativeInput.focus).toHaveBeenCalledTimes(1);
+  it('prevents a newline when Enter creates a task', () => {
+    const component = new TaskItemComponent({} as never);
+    component.task = { text: 'Work', status: '❌' };
+    const enter = spyOn(component.enterKey, 'emit');
+    const event = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true });
+    component.handleKeydown(event);
+    expect(event.defaultPrevented).toBeTrue();
+    expect(enter).toHaveBeenCalledTimes(1);
   });
 });

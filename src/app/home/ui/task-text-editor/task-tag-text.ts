@@ -1,0 +1,25 @@
+export const taskTagSuggestions = ['M', 'RTP'];
+
+// Private-use delimiters keep ordinary bracket notation out of Tagify's parser.
+export const tagDelimiters: [string, string] = ['\uE000', '\uE001'];
+
+export function toTagifyText(text: string): string {
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return escaped.replace(/(^|\s)@(M|RTP)(?=$|\s|[.,!?;:)])/g, (_match, before: string, value: string) => {
+    return before + tagDelimiters[0] + JSON.stringify({ value, prefix: '@' }) + tagDelimiters[1];
+  });
+}
+
+export function fromTagifyText(text: string): string {
+  return text.replace(/\uE000([^\uE001]*)\uE001/g, (match, json: string) => {
+    try {
+      const tag: unknown = JSON.parse(json);
+      if (typeof tag === 'object' && tag !== null && 'value' in tag && typeof tag.value === 'string') {
+        return '@' + tag.value;
+      }
+    } catch {
+      // Preserve literal text that happens to contain the editor delimiters.
+    }
+    return match;
+  }).replace(/\u200B/g, '').replace(/\u00A0/g, ' ').replace(/\r?\n$/, '').replace(/[\r\n]+/g, ' ');
+}
