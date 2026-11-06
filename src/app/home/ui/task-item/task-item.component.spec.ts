@@ -84,4 +84,30 @@ describe('Task row rendered editor', () => {
     fixture.destroy();
     discardPeriodicTasks();
   }));
+
+  it('retains keyboard focus when switching to a heading and back', async () => {
+    TestBed.configureTestingModule({ imports: [TaskItemComponent] });
+    const fixture = TestBed.createComponent(TaskItemComponent);
+    fixture.componentRef.setInput('task', { text: 'Work @M', status: '❌' });
+    fixture.detectChanges();
+    const focus = spyOn(fixture.componentInstance, 'focusInput').and.callThrough();
+    const editor = fixture.nativeElement.querySelector('.tagify__input') as HTMLElement;
+    editor.focus();
+    editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', ctrlKey: true, bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+    expect(focus).toHaveBeenCalledTimes(1);
+    await focus.calls.mostRecent()?.returnValue;
+    const heading = await fixture.componentInstance.headingInput!.getInputElement();
+    expect(heading.matches(':focus')).toBeTrue();
+
+    heading!.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'h', ctrlKey: true, bubbles: true, cancelable: true, composed: true,
+    }));
+    fixture.detectChanges();
+    expect(focus).toHaveBeenCalledTimes(2);
+    await focus.calls.mostRecent()?.returnValue;
+    const restoredEditor = fixture.nativeElement.querySelector('.tagify__input') as HTMLElement;
+    expect(document.activeElement).toBe(restoredEditor);
+    fixture.destroy();
+  });
 });

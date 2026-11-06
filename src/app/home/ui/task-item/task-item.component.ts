@@ -120,6 +120,9 @@ export class TaskItemComponent implements OnInit, OnDestroy {
 
   toggleSectionHeading() {
     this.updateTask({ sectionHeading: !(this.task.sectionHeading ?? false) });
+    // The editor type changes, so render its replacement before restoring focus.
+    this.changeDetectorRef.detectChanges();
+    void this.focusInput();
   }
 
   emitEnterKey() {
