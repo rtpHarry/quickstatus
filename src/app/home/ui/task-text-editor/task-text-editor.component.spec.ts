@@ -53,18 +53,18 @@ describe('Task text tag editor', () => {
 
   it('refreshes dynamic suggestions and renders removed tags as plain text without changing the task', fakeAsync(() => {
     suggestions.next(['Client', 'personal']);
-    fixture.componentRef.setInput('text', '@Client Work @personal');
+    fixture.componentRef.setInput('text', '@CLIENT Work @PERSONAL');
     fixture.detectChanges();
     tick(100);
-    expect(editor().getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['Client', 'personal']);
+    expect(editor().getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['CLIENT', 'PERSONAL']);
     const changed = spyOn(fixture.componentInstance.textChange, 'emit');
 
     suggestions.next(['personal']);
     fixture.detectChanges();
     tick(200);
-    expect(editor().whitelist).toEqual(['personal']);
-    expect(editor().getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['personal']);
-    expect(editor().DOM.input.textContent).toContain('@Client Work');
+    expect(editor().whitelist).toEqual(['PERSONAL']);
+    expect(editor().getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['PERSONAL']);
+    expect(editor().DOM.input.textContent).toContain('@CLIENT Work');
     expect(changed).not.toHaveBeenCalled();
   }));
 

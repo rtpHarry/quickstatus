@@ -63,20 +63,20 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     await service.createProject({ id: 'other', name: 'Other' });
     await service.setProjectTasks('other', '✅ @personal Done [id:2]');
     await service.initialize();
-    expect(service.autocompleteTags).toEqual(jasmine.arrayWithExactContents(['Saved', 'RTP', 'Client', 'personal']));
+    expect(service.autocompleteTags).toEqual(jasmine.arrayWithExactContents(['SAVED', 'RTP', 'CLIENT', 'PERSONAL']));
 
     const before = await service.exportSnapshot();
     await service.saveAutocompleteTags(['Saved']);
-    expect(service.autocompleteTags).toEqual(['Saved']);
+    expect(service.autocompleteTags).toEqual(['SAVED']);
     expect(await service.exportSnapshot()).toEqual(before);
-    expect((await service.exportBackup()).metadata['autocompleteTags']).toEqual(['Saved']);
+    expect((await service.exportBackup()).metadata['autocompleteTags']).toEqual(['SAVED']);
     await service.initialize();
-    expect(service.autocompleteTags).toContain('Client');
+    expect(service.autocompleteTags).toContain('CLIENT');
 
     await service.setProjectTasks(id, '');
     await service.setProjectTasks('other', '');
     await service.initialize();
-    expect(service.autocompleteTags).toEqual(jasmine.arrayWithExactContents(['Saved', 'RTP', 'Client', 'personal']));
+    expect(service.autocompleteTags).toEqual(jasmine.arrayWithExactContents(['SAVED', 'RTP', 'CLIENT', 'PERSONAL']));
   });
 
   it('migrates legacy project-name keys without removing the source', async () => {

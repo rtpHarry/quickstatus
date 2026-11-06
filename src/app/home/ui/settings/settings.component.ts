@@ -16,7 +16,7 @@ import { settingsOutline } from 'ionicons/icons';
 import { TagData, TagifySettings } from '@yaireo/tagify';
 import { TagifyComponent, TagifyService } from 'ngx-tagify';
 import { ProjectStorageService } from '../../data/project-storage.service';
-import { taskTagPattern } from '../../data/task-tags';
+import { normalizeTaskTag, normalizeTaskTags, taskTagPattern } from '../../data/task-tags';
 
 @Component({
   selector: 'app-settings',
@@ -40,10 +40,11 @@ export class SettingsComponent {
     editTags: false,
     backspace: true,
     duplicates: false,
+    skipInvalid: true,
     placeholder: 'Add a tag',
     dropdown: { enabled: false },
     transformTag: (tag) => {
-      tag.value = tag.value.trim().replace(/^@/, '');
+      tag.value = normalizeTaskTag(tag.value);
     },
   };
 
@@ -56,7 +57,7 @@ export class SettingsComponent {
   }
 
   open(): void {
-    this.tags = this.storage.autocompleteTags.sort((a, b) => a.localeCompare(b)).map((value) => ({ value }));
+    this.tags = normalizeTaskTags(this.storage.autocompleteTags).sort((a, b) => a.localeCompare(b)).map((value) => ({ value }));
     this.error = '';
   }
 

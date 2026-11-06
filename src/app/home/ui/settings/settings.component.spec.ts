@@ -45,24 +45,32 @@ describe('Autocomplete tag settings', () => {
   it('uses a tag-only cloud, accepts new tags and saves removals', async () => {
     expect(tagify.settings.mode).not.toBe('mix');
     tagify.addTags('@follow-up');
-    await tagify.removeTags('Client', false, 0);
+    await tagify.removeTags('CLIENT', false, 0);
     await component.save();
-    expect(saved).toEqual(['personal', 'follow-up']);
+    expect(saved).toEqual(['PERSONAL', 'FOLLOW-UP']);
     expect(dismiss).toHaveBeenCalled();
   });
 
   it('reloads the saved values when opened without saving a draft', () => {
     component.tags.push({ value: 'Temporary' });
     component.open();
-    expect(component.tags.map((tag) => tag.value)).toEqual(['Client', 'personal']);
+    expect(component.tags.map((tag) => tag.value)).toEqual(['CLIENT', 'PERSONAL']);
     expect(save).not.toHaveBeenCalled();
+  });
+
+  it('uppercases new tags and silently dismisses casing variants of existing tags', async () => {
+    tagify.addTags(['client', 'cLiEnT', '@Personal', 'newTag', 'NEWTAG']);
+    expect(tagify.value.map((tag) => tag.value)).toEqual(['CLIENT', 'PERSONAL', 'NEWTAG']);
+    expect(tagify.getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['CLIENT', 'PERSONAL', 'NEWTAG']);
+    await component.save();
+    expect(saved).toEqual(['CLIENT', 'PERSONAL', 'NEWTAG']);
   });
 
   it('sorts added tags alphabetically in the cloud and saved values without moving focus', async () => {
     tagify.DOM.input.focus();
     tagify.addTags(['Zulu', 'alpha', 'Bravo']);
     component.sortTags();
-    const expected = ['alpha', 'Bravo', 'Client', 'personal', 'Zulu'];
+    const expected = ['ALPHA', 'BRAVO', 'CLIENT', 'PERSONAL', 'ZULU'];
     expect(tagify.getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(expected);
     expect(tagify.value.map((tag) => tag.value)).toEqual(expected);
     expect(document.activeElement).toBe(tagify.DOM.input);
@@ -72,7 +80,7 @@ describe('Autocomplete tag settings', () => {
 
   it('rejects prose and invalid tag characters', () => {
     tagify.addTags(['two words', 'bad!', 'équipe']);
-    expect(tagify.value.map((tag) => tag.value)).toEqual(['Client', 'personal', 'équipe']);
+    expect(tagify.value.map((tag) => tag.value)).toEqual(['CLIENT', 'PERSONAL', 'ÉQUIPE']);
   });
 
   it('keeps the modal open with an error if saving fails', async () => {

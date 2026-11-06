@@ -4,6 +4,7 @@ import Tagify, { TagifySettings } from '@yaireo/tagify';
 import { TagifyComponent, TagifyService } from 'ngx-tagify';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ProjectStorageService } from '../../data/project-storage.service';
+import { normalizeTaskTag, normalizeTaskTags } from '../../data/task-tags';
 import { fromTagifyText, sortTaskTagsToStart, tagDelimiters, toTagifyText } from './task-tag-text';
 
 @Component({
@@ -40,6 +41,9 @@ export class TaskTextEditorComponent implements AfterViewInit {
     whitelist: [],
     enforceWhitelist: true,
     duplicates: true,
+    transformTag: (tag) => {
+      tag.value = normalizeTaskTag(tag.value);
+    },
     editTags: false,
     backspace: true,
     placeholder: 'Enter task',
@@ -52,6 +56,7 @@ export class TaskTextEditorComponent implements AfterViewInit {
 
   constructor(private tagifyService: TagifyService, private storage: ProjectStorageService) {
     this.storage.autocompleteTags$.pipe(takeUntilDestroyed()).subscribe((tags) => {
+      tags = normalizeTaskTags(tags);
       this.settings.whitelist = [...tags];
       this.editorValue = toTagifyText(this.currentText, tags);
       const editor = this.tagifyService.get('task');
