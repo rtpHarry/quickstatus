@@ -1,8 +1,8 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, EventEmitter, Input, Output, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import Tagify, { TagifySettings } from '@yaireo/tagify';
 import { TagifyComponent, TagifyService } from 'ngx-tagify';
-import { fromTagifyText, tagDelimiters, taskTagSuggestions, toTagifyText } from './task-tag-text';
+import { fromTagifyText, sortTaskTagsToStart, tagDelimiters, taskTagSuggestions, toTagifyText } from './task-tag-text';
 
 @Component({
   selector: 'app-task-text-editor',
@@ -22,6 +22,7 @@ export class TaskTextEditorComponent implements AfterViewInit {
   }
   @Output() textChange = new EventEmitter<string>();
   @Output() editorKeydown = new EventEmitter<KeyboardEvent>();
+  @ViewChild(TagifyComponent) private tagInput!: TagifyComponent;
 
   editorValue = '';
   private currentText = '';
@@ -76,6 +77,21 @@ export class TaskTextEditorComponent implements AfterViewInit {
       this.currentText = text;
       this.textChange.emit(text);
     }
+  }
+
+  onTagAdded(): void {
+    // Run after Tagify's queued insertion caret placement has finished.
+    setTimeout(() => {
+      const editor = this.tagifyService.get('task');
+      if (!editor) {
+        return;
+      }
+      const text = sortTaskTagsToStart(editor.getMixedTagsAsString(), editor.value.map((tag) => tag.value));
+      editor.loadOriginalValues(toTagifyText(text));
+      // Report a view change through the wrapper so ngModel doesn't reload the DOM.
+      this.tagInput.value = editor.getMixedTagsAsString();
+      void this.focus();
+    });
   }
 
   preventLineBreak(event: Event): void {

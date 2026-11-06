@@ -3,5 +3,6 @@
   [settings]="settings"
   [ngModel]="editorValue"
   (ngModelChange)="onEditorChange($event)"
+  (add)="onTagAdded()"
   (beforeinput)="preventLineBreak($event)"
 ></tagify>

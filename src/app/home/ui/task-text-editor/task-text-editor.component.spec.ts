@@ -72,7 +72,7 @@ describe('Task text tag editor', () => {
     expect(selection.anchorOffset).toBe(input.childNodes.length);
   });
 
-  it('saves inserted tags as @ text without moving tags or leaking Tagify JSON', fakeAsync(() => {
+  it('moves an accepted tag to the start and saves readable @ text', fakeAsync(() => {
     fixture.componentRef.setInput('text', 'Work ');
     fixture.detectChanges();
     tick(100);
@@ -85,11 +85,61 @@ describe('Task text tag editor', () => {
     const text = changed.calls.mostRecent().args[0]!;
     expect(text).toContain('Work');
     expect(text).toContain('@RTP');
-    expect(text.indexOf('@RTP')).toBeGreaterThan(text.indexOf('Work'));
+    expect(text.trim()).toBe('@RTP Work');
     expect(text).not.toContain('"value"');
     fixture.componentRef.setInput('text', text);
     fixture.detectChanges();
     expect(editor().getTagElms().length).toBe(1);
+  }));
+
+  it('sorts all accepted tags at the start and leaves the focused caret at the end', fakeAsync(() => {
+    fixture.componentRef.setInput('text', 'Work @RTP details [M] a@M.com <b>');
+    fixture.detectChanges();
+    tick(100);
+    const tagify = editor();
+    const input = tagify.DOM.input;
+    input.focus();
+    const range = document.createRange();
+    range.setStart(input.firstChild!, 5);
+    range.collapse(true);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const changed = spyOn(fixture.componentInstance.textChange, 'emit');
+    document.execCommand('insertText', false, '@M');
+    tick(200);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    tick(200);
+
+    fixture.componentRef.setInput('text', changed.calls.mostRecent().args[0]);
+    fixture.detectChanges();
+    tick(200);
+    const text = changed.calls.mostRecent().args[0]!;
+    expect(text).toBe('@M @RTP Work details [M] a@M.com <b>');
+    expect(tagify.getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['M', 'RTP']);
+    expect(input.querySelector('b')).toBeNull();
+    expect(document.activeElement).toBe(input);
+    expect(selection.isCollapsed).toBeTrue();
+    expect(selection.anchorNode).toBe(input);
+    expect(selection.anchorOffset).toBe(input.childNodes.length);
+    document.execCommand('insertText', false, ' next');
+    tick(200);
+    expect(changed.calls.mostRecent().args[0]).toBe(text + ' next');
+  }));
+
+  it('leaves a space for typing after accepting a tag in an empty row', fakeAsync(() => {
+    fixture.detectChanges();
+    tick(100);
+    const changed = spyOn(fixture.componentInstance.textChange, 'emit');
+    typeText('@R');
+    tick(200);
+    editor().DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    tick(200);
+    fixture.detectChanges();
+    tick(100);
+    document.execCommand('insertText', false, 'Task');
+    tick(200);
+    expect(changed.calls.mostRecent().args[0]).toBe('@RTP Task');
   }));
 
   it('offers the two suggestions after @ and leaves navigation to the dropdown', fakeAsync(() => {
