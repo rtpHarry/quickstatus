@@ -153,10 +153,9 @@ export class TaskListComponent implements OnDestroy {
   handleUpArrow(index: number) {
     if (index > 0) {
       setTimeout(() => {
-        const inputs = document.querySelectorAll('ion-input');
-        const prevInput = inputs[index - 1] as HTMLIonInputElement;
-        if (prevInput) {
-          prevInput.setFocus();
+        const previousRow = this.taskItems?.get(index - 1);
+        if (previousRow) {
+          void previousRow.focusInput();
         }
       });
     }
@@ -165,10 +164,9 @@ export class TaskListComponent implements OnDestroy {
   handleDownArrow(index: number) {
     if (index < this.tasks.length - 1) {
       setTimeout(() => {
-        const inputs = document.querySelectorAll('ion-input');
-        const nextInput = inputs[index + 1] as HTMLIonInputElement;
-        if (nextInput) {
-          nextInput.setFocus();
+        const nextRow = this.taskItems?.get(index + 1);
+        if (nextRow) {
+          void nextRow.focusInput();
         }
       });
     }
@@ -382,10 +380,9 @@ export class TaskListComponent implements OnDestroy {
     this.pendingFocusIndex = null;
 
     setTimeout(() => {
-      const inputs = document.querySelectorAll('ion-input');
-      if (inputs.length > focusIndex) {
-        const inputToFocus = inputs[focusIndex] as HTMLIonInputElement;
-        inputToFocus?.setFocus();
+      const row = this.taskItems?.get(focusIndex);
+      if (row) {
+        void row.focusInput();
       }
     });
   }

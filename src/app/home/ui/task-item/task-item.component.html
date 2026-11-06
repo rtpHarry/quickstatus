@@ -32,19 +32,24 @@
         </div>
       </ion-col>
       <ion-col>
-        <ion-input
-          [class.section-heading-input]="task.sectionHeading === true"
-          style="width: 100%"
-          [ngModel]="task.text"
-          (ngModelChange)="onTextChange($event)"
-          (keydown.enter)="emitEnterKey()"
-          (keydown)="handleKeydown($event)"
-          placeholder="Enter task"
-          name="task"
-          autocomplete="off"
-          data-lpignore="true"
-          role="note"
-        ></ion-input>
+        @if (task.sectionHeading === true) {
+          <ion-input
+            class="section-heading-input"
+            [ngModel]="task.text"
+            (ngModelChange)="onTextChange($event)"
+            (keydown)="handleKeydown($event)"
+            placeholder="Enter heading"
+            aria-label="Section heading"
+            autocomplete="off"
+            data-lpignore="true"
+          ></ion-input>
+        } @else {
+          <app-task-text-editor
+            [text]="task.text"
+            (textChange)="onTextChange($event)"
+            (editorKeydown)="handleKeydown($event)"
+          ></app-task-text-editor>
+        }
       </ion-col>
       <ion-col size="auto" class="task-actions">
         @if (ageBadge; as badge) {
