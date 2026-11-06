@@ -115,16 +115,16 @@ describe('Task text tag editor', () => {
     fixture.detectChanges();
     tick(200);
     const text = changed.calls.mostRecent().args[0]!;
-    expect(text).toBe('@M @RTP Work details [M] a@M.com <b>');
+    expect(text).toBe('@M @RTP Work details [M] a@M.com <b> ');
     expect(tagify.getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['M', 'RTP']);
     expect(input.querySelector('b')).toBeNull();
     expect(document.activeElement).toBe(input);
     expect(selection.isCollapsed).toBeTrue();
     expect(selection.anchorNode).toBe(input);
     expect(selection.anchorOffset).toBe(input.childNodes.length);
-    document.execCommand('insertText', false, ' next');
+    document.execCommand('insertText', false, 'next');
     tick(200);
-    expect(changed.calls.mostRecent().args[0]).toBe(text + ' next');
+    expect(changed.calls.mostRecent().args[0]).toBe(text + 'next');
   }));
 
   it('leaves a space for typing after accepting a tag in an empty row', fakeAsync(() => {

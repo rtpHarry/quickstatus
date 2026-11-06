@@ -6,8 +6,8 @@ export const tagDelimiters: [string, string] = ['\uE000', '\uE001'];
 export function sortTaskTagsToStart(mixedText: string, tagValues: string[]): string {
   const description = fromTagifyText(mixedText.replace(/\uE000[^\uE001]*\uE001[ \u00A0]*/g, '')).trim();
   const prefix = [...tagValues].sort((a, b) => a.localeCompare(b)).map((value) => '@' + value).join(' ');
-  // Keep a separator for continued typing when the row contains only tags.
-  return `${prefix} ${description}`;
+  // Leave exactly one separator at the caret for continued typing.
+  return description ? `${prefix} ${description} ` : `${prefix} `;
 }
 
 export function toTagifyText(text: string): string {
