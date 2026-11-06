@@ -11,7 +11,8 @@ export function taskChangeEvents(before: Task, after: Task): TaskActivityDraft[]
     before: taskFacts(before), after: taskFacts(after) };
   if (!isRealTask(before) && isRealTask(after)) return [{ ...common, type: 'entered' }];
   if (common.before.hasText !== common.after.hasText
-    || common.before.sectionHeading !== common.after.sectionHeading) {
+    || common.before.sectionHeading !== common.after.sectionHeading
+    || JSON.stringify(common.before.tags) !== JSON.stringify(common.after.tags)) {
     return [{ ...common, type: 'membership-changed' }];
   }
   return before.status !== after.status ? [{ ...common, type: 'status-changed' }] : [];

@@ -31,6 +31,7 @@ export class SettingsComponent {
   @ViewChild(IonModal) modal?: IonModal;
 
   tags: TagData[] = [];
+  excludedTags: TagData[] = [];
   saving = false;
   error = '';
 
@@ -58,17 +59,20 @@ export class SettingsComponent {
 
   open(): void {
     this.tags = normalizeTaskTags(this.storage.autocompleteTags).sort((a, b) => a.localeCompare(b)).map((value) => ({ value }));
+    this.excludedTags = normalizeTaskTags(this.storage.excludedHistoryTags).sort((a, b) => a.localeCompare(b)).map((value) => ({ value }));
     this.error = '';
   }
 
   labelTagInput(): void {
-    const input = this.tagifyService.get('autocomplete-tags')?.DOM.input;
-    input?.setAttribute('aria-labelledby', 'autocomplete-tags-label');
-    input?.setAttribute('aria-describedby', 'autocomplete-tags-help');
+    for (const name of ['autocomplete-tags', 'excluded-history-tags']) {
+      const input = this.tagifyService.get(name)?.DOM.input;
+      input?.setAttribute('aria-labelledby', name + '-label');
+      input?.setAttribute('aria-describedby', 'autocomplete-tags-help');
+    }
   }
 
-  sortTags(): void {
-    const editor = this.tagifyService.get('autocomplete-tags');
+  sortTags(name = 'autocomplete-tags'): void {
+    const editor = this.tagifyService.get(name);
     if (!editor) {
       return;
     }
@@ -86,18 +90,22 @@ export class SettingsComponent {
       return;
     }
     const editor = this.tagifyService.get('autocomplete-tags');
-    const pending = editor?.DOM.input.textContent?.trim();
-    if (pending) {
-      editor?.addTags(pending);
-      if (editor?.DOM.input.textContent?.trim()) {
-        this.error = 'Use letters, numbers, underscores or hyphens for each tag.';
-        return;
+    const excludedEditor = this.tagifyService.get('excluded-history-tags');
+    for (const input of [editor, excludedEditor]) {
+      const pending = input?.DOM.input.textContent?.trim();
+      if (pending) {
+        if (pending.split(/,|\n/).some((tag) => !taskTagPattern.test(normalizeTaskTag(tag)))) {
+          this.error = 'Use letters, numbers, underscores or hyphens for each tag.';
+          return;
+        }
+        input?.addTags(pending, true);
       }
     }
     this.saving = true;
     this.error = '';
     try {
       await this.storage.saveAutocompleteTags((editor?.value ?? this.tags).map((tag) => tag.value));
+      await this.storage.saveExcludedHistoryTags((excludedEditor?.value ?? this.excludedTags).map((tag) => tag.value));
       await this.modal?.dismiss();
     } catch {
       this.error = 'Could not save settings. Please try again.';

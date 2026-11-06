@@ -79,6 +79,35 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     expect(service.autocompleteTags).toEqual(jasmine.arrayWithExactContents(['SAVED', 'RTP', 'CLIENT', 'PERSONAL']));
   });
 
+  it('filters tagged activity from history while preserving the stored totals and settings across restore', async () => {
+    const initial = await service.initialize();
+    const projectId = initial.projects[0].id;
+    const [first, second] = await service.allocateTaskIds(2);
+    const tasks = [
+      { ...createEmptyTask(first), text: '@personal Private work' },
+      { ...createEmptyTask(second), text: '@client Paid work' },
+    ];
+    await service.commitTaskActivity({ projectId, tasks: stringifyTasks(tasks), events: tasks.map((task) => ({
+      taskId: task.id!, type: 'entered', source: 'normal', before: null, after: taskFacts(task),
+    })) });
+    const completed = tasks.map((task) => ({ ...task, status: '✅' }));
+    await service.commitTaskActivity({ projectId, tasks: stringifyTasks(completed), events: completed.map((task, index) => ({
+      taskId: task.id!, type: 'status-changed', source: 'normal', before: taskFacts(tasks[index]), after: taskFacts(task),
+    })) });
+    await service.saveExcludedHistoryTags(['@Personal']);
+    const today = localActivityDate();
+    expect(await service.getDailyHistory(projectId, today, today)).toEqual([jasmine.objectContaining({
+      created: 1, completed: 1, completedNew: 1, remaining: 0, closingTotal: 1,
+    })]);
+    expect((await service.getDailySummary(projectId, today))?.completed).toBe(2);
+    await service.restoreBackup(await service.exportBackup());
+    expect(service.excludedHistoryTags).toEqual(['PERSONAL']);
+    await service.initialize();
+    expect(service.excludedHistoryTags).toEqual(['PERSONAL']);
+    await service.saveExcludedHistoryTags([]);
+    expect((await service.getDailyHistory(projectId, today, today))[0].completed).toBe(2);
+  });
+
   it('migrates legacy project-name keys without removing the source', async () => {
     localStorage.setItem('taskList:projects', JSON.stringify(['Work']));
     localStorage.setItem('taskList:Work', '☑️ old format');
@@ -275,7 +304,7 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     await service.initialize();
     const baseline = await service.getTrackingBaseline('one');
     expect(baseline?.tasks[0].facts).toEqual({
-      status: '✅', hasText: true, sectionHeading: false, created: '2026/10/01',
+      status: '✅', hasText: true, sectionHeading: false, created: '2026/10/01', tags: [],
     });
     expect(JSON.stringify(baseline)).not.toContain('existing complete');
     await service.initialize();

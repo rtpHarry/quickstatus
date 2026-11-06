@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { taskRemovalEvents } from '../analytics/task-actions';
 import { applyTaskActivity, dailyMetrics, metricDateRange, rebuildProjectMetrics } from '../analytics/project-metrics';
-import { baselineKey, CommittedProjectActivity, dailySummaryKey, isTaskActivity, isTrackingBaseline, localActivityDate, ProjectActivityMutation, ProjectDailySummary, ProjectTaskProjection, projectionKey, TaskActivity, taskFacts, TaskTrackingBaseline } from '../analytics/task-activity.types';
+import { baselineKey, CommittedProjectActivity, dailySummaryKey, isTaskActivity, isTrackingBaseline, localActivityDate, ProjectActivityMutation, ProjectDailySummary, ProjectTaskProjection, projectionKey, TaskActivity, historyTaskFacts, taskFacts, TaskTrackingBaseline } from '../analytics/task-activity.types';
 import { createEmptyTask, normalizeTaskListIds, parseTasksString, stringifyTasks } from '../ui/task-list/task-list.utils';
 import { idbRequest, openProjectDatabase, projectStoreNames, transactionDone } from './project-storage.database';
 import { LegacyStorageBackup, Project, ProjectStorageBackup, ProjectStorageSnapshot, StoredProject } from './project-storage.types';
@@ -17,6 +17,8 @@ export class ProjectStorageService {
   get autocompleteTags(): string[] {
     return [...this.autocompleteTagsSubject.value];
   }
+
+  excludedHistoryTags: string[] = [];
 
   private readonly projectsKey = 'taskList:projects';
   private readonly legacyKey = 'taskList';
@@ -60,6 +62,7 @@ export class ProjectStorageService {
         }
         await this.normalizeStoredTaskIds(transaction);
         autocompleteTags = await this.upgradeStoredTaskTags(transaction);
+        this.excludedHistoryTags = await this.readExcludedHistoryTags(transaction);
         await this.ensureTrackingBaselines(transaction);
         await this.ensureProjectMetrics(transaction);
         await done;
@@ -105,6 +108,19 @@ export class ProjectStorageService {
       transaction.objectStore('metadata').put(normalized, 'autocompleteTags');
     });
     this.autocompleteTagsSubject.next(normalized);
+  }
+
+  private async readExcludedHistoryTags(transaction: IDBTransaction): Promise<string[]> {
+    const saved: unknown = await idbRequest(transaction.objectStore('metadata').get('excludedHistoryTags'));
+    return normalizeTaskTags(Array.isArray(saved) ? saved.filter((tag): tag is string => typeof tag === 'string') : []);
+  }
+
+  async saveExcludedHistoryTags(tags: string[]): Promise<void> {
+    const normalized = normalizeTaskTags(tags);
+    await this.write(['metadata'], (transaction) => {
+      transaction.objectStore('metadata').put(normalized, 'excludedHistoryTags');
+    });
+    this.excludedHistoryTags = normalized;
   }
 
   async addAutocompleteTags(tags: string[]): Promise<void> {
@@ -301,11 +317,29 @@ export class ProjectStorageService {
   getDailyHistory(projectId: string, fromDate: string, toDate: string): Promise<ProjectDailySummary[]> {
     return this.enqueue(async () => {
       const db = await this.getDatabase();
-      const tx = db.transaction('analytics', 'readonly');
+      const tx = db.transaction(['analytics', 'events', 'metadata'], 'readonly');
       const done = transactionDone(tx);
-      const prefix = `daily:${projectId}:`;
-      const summaries = await idbRequest<ProjectDailySummary[]>(tx.objectStore('analytics')
-        .getAll(IDBKeyRange.bound(prefix, dailySummaryKey(projectId, toDate))));
+      const excluded = await this.readExcludedHistoryTags(tx);
+      let summaries: ProjectDailySummary[];
+      if (excluded.length) {
+        const baseline = await idbRequest<TaskTrackingBaseline | undefined>(tx.objectStore('analytics').get(baselineKey(projectId)));
+        const events = await idbRequest<TaskActivity[]>(tx.objectStore('events').index('projectDate')
+          .getAll(IDBKeyRange.bound([projectId, ''], [projectId, toDate])));
+        summaries = baseline ? rebuildProjectMetrics({
+          ...baseline, tasks: baseline.tasks.map((task) => ({ ...task, facts: historyTaskFacts(task.facts, excluded) })),
+        }, events.map((event) => {
+          const before = event.before ? historyTaskFacts(event.before, excluded) : null;
+          const after = event.after ? historyTaskFacts(event.after, excluded) : null;
+          // Removing an excluded tag brings the task into the measured list.
+          const type = event.type === 'membership-changed' && !before?.hasText && after?.hasText
+            && !after.sectionHeading ? 'entered' : event.type;
+          return { ...event, type, before, after };
+        })).summaries : [];
+      } else {
+        const prefix = `daily:${projectId}:`;
+        summaries = await idbRequest<ProjectDailySummary[]>(tx.objectStore('analytics')
+          .getAll(IDBKeyRange.bound(prefix, dailySummaryKey(projectId, toDate))));
+      }
       await done;
       return metricDateRange(projectId, fromDate, toDate, summaries);
     });
@@ -484,6 +518,7 @@ export class ProjectStorageService {
       await this.normalizeStoredTaskIds(transaction);
       await this.ensureTrackingBaselines(transaction);
       await this.ensureProjectMetrics(transaction, true);
+      this.excludedHistoryTags = await this.readExcludedHistoryTags(transaction);
     }).then(() => { this.restoredSubject.next(); });
   }
 

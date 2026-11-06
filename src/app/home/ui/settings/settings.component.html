@@ -25,6 +25,14 @@
         [disabled]="saving"
         (add)="sortTags()"
       ></tagify>
+      <h2 id="excluded-history-tags-label">Exclude these tags from the stats history</h2>
+      <tagify
+        name="excluded-history-tags"
+        [settings]="tagSettings"
+        [(ngModel)]="excludedTags"
+        [disabled]="saving"
+        (add)="sortTags('excluded-history-tags')"
+      ></tagify>
       <p *ngIf="error" role="alert">{{ error }}</p>
     </ion-content>
   </ng-template>

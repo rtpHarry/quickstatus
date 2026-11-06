@@ -1,11 +1,13 @@
+import { findTaskTags } from '../data/task-tags';
 import { Task } from '../ui/task-list/task-list.utils';
 
-/** Analytics facts deliberately exclude task text and privacy settings. */
+/** Analytics facts deliberately exclude task text and privacy settings, retaining tags for history filters. */
 export interface TaskFacts {
   status: string;
   hasText: boolean;
   sectionHeading: boolean;
   created: string | null;
+  tags?: string[];
 }
 
 export type TaskActivityType = 'entered' | 'status-changed' | 'membership-changed' | 'deleted' | 'restored';
@@ -94,7 +96,12 @@ export function taskFacts(task: Task): TaskFacts {
     hasText: task.text.trim().length > 0,
     sectionHeading: task.sectionHeading === true,
     created: task.created ?? null,
+    tags: findTaskTags(task.text),
   };
+}
+
+export function historyTaskFacts(facts: TaskFacts, excludedTags: string[]): TaskFacts {
+  return { ...facts, hasText: facts.hasText && !facts.tags?.some((tag) => excludedTags.includes(tag)) };
 }
 
 export function isTaskActivity(value: unknown): value is TaskActivity {
@@ -122,6 +129,8 @@ export function isTrackingBaseline(value: unknown): value is TaskTrackingBaselin
 function isTaskFacts(value: unknown): value is TaskFacts {
   return isRecord(value) && typeof value['status'] === 'string'
     && typeof value['hasText'] === 'boolean' && typeof value['sectionHeading'] === 'boolean'
+    && (value['tags'] === undefined || (Array.isArray(value['tags'])
+      && value['tags'].every((tag: unknown) => typeof tag === 'string')))
     && (value['created'] === null || typeof value['created'] === 'string');
 }
 

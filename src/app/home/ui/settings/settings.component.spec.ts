@@ -5,6 +5,9 @@ describe('Autocomplete tag settings', () => {
   let component: SettingsComponent;
   let tagify: Tagify;
   let input: HTMLInputElement;
+  let excludedInput: HTMLInputElement;
+  let excludedTagify: Tagify;
+  let saveExcluded: jasmine.Spy;
   let saved: string[];
   let save: jasmine.Spy;
   let dismiss: jasmine.Spy;
@@ -17,15 +20,18 @@ describe('Autocomplete tag settings', () => {
     save = jasmine.createSpy('saveAutocompleteTags').and.callFake(async (tags: string[]) => {
       saved = [...tags];
     });
+    saveExcluded = jasmine.createSpy('saveExcludedHistoryTags').and.resolveTo();
     dismiss = jasmine.createSpy('dismiss').and.resolveTo(true);
     component = new SettingsComponent(
       {
         get autocompleteTags() {
           return [...saved];
         },
+        excludedHistoryTags: [],
+        saveExcludedHistoryTags: saveExcluded,
         saveAutocompleteTags: save,
       } as never,
-      { get: () => tagify } as never,
+      { get: (name: string) => name === 'autocomplete-tags' ? tagify : excludedTagify } as never,
       { markForCheck: () => undefined } as never
     );
     component.modal = { dismiss } as never;
@@ -34,9 +40,14 @@ describe('Autocomplete tag settings', () => {
     document.body.appendChild(input);
     tagify = new Tagify(input, component.tagSettings);
     tagify.addTags(component.tags);
+    excludedInput = document.createElement('input');
+    document.body.appendChild(excludedInput);
+    excludedTagify = new Tagify(excludedInput, component.tagSettings);
   });
 
   afterEach(() => {
+    excludedTagify.destroy();
+    excludedInput.remove();
     tagify.destroy();
     input.remove();
     document.body.style.display = originalDisplay;
@@ -81,6 +92,22 @@ describe('Autocomplete tag settings', () => {
   it('rejects prose and invalid tag characters', () => {
     tagify.addTags(['two words', 'bad!', 'équipe']);
     expect(tagify.value.map((tag) => tag.value)).toEqual(['CLIENT', 'PERSONAL', 'ÉQUIPE']);
+  });
+
+  it('saves pending exclusion tags independently of autocomplete suggestions', async () => {
+    excludedTagify.addTags('@personal');
+    excludedTagify.DOM.input.textContent = 'internal';
+    await component.save();
+    expect(saveExcluded).toHaveBeenCalledWith(['PERSONAL', 'INTERNAL']);
+    expect(saved).toEqual(['CLIENT', 'PERSONAL']);
+    expect(dismiss).toHaveBeenCalled();
+  });
+
+  it('keeps the settings open if exclusion saving fails', async () => {
+    saveExcluded.and.rejectWith(new Error('Storage unavailable'));
+    await component.save();
+    expect(component.error).toContain('Could not save');
+    expect(dismiss).not.toHaveBeenCalled();
   });
 
   it('keeps the modal open with an error if saving fails', async () => {

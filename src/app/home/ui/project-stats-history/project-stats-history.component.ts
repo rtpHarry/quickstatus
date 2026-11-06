@@ -4,7 +4,7 @@ import { ProjectAnalyticsService } from '../../analytics/project-analytics.servi
 import { ProjectStorageService } from '../../data/project-storage.service';
 import { baselineProjection, closingSummary } from '../../analytics/project-metrics';
 import { formatHistoryDate, historyRows, shiftDate, signedChange, HistoryRow } from './stats-history';
-import { localActivityDate } from '../../analytics/task-activity.types';
+import { historyTaskFacts, localActivityDate } from '../../analytics/task-activity.types';
 import { sampleStatsHistory } from './sample-stats-history';
 
 @Component({
@@ -87,7 +87,11 @@ export class ProjectStatsHistoryComponent {
       const from = shiftDate(today, 1 - days);
       const baseline = await this.storage.getTrackingBaseline(this.historyProjectId);
       const summaries = await this.analytics.history(this.historyProjectId, shiftDate(from, -1), today);
-      const opening = baseline ? closingSummary(baselineProjection(baseline), baseline.localDate).remaining : 0;
+      const opening = baseline ? closingSummary(baselineProjection({
+        ...baseline, tasks: baseline.tasks.map((task) => ({
+          ...task, facts: historyTaskFacts(task.facts, this.storage.excludedHistoryTags),
+        })),
+      }), baseline.localDate).remaining : 0;
       this.rows = historyRows(summaries, from, opening, baseline?.localDate);
       this.canLoadOlder = !!baseline && baseline.localDate < from;
       this.days = days;
