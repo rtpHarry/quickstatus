@@ -71,7 +71,7 @@ describe('Task row rendered editor', () => {
     expect(getComputedStyle(input).whiteSpace).toBe('pre');
     expect(getComputedStyle(input).lineHeight).toBe('28px');
     const label = editor.querySelector('.tagify__tag-text')!;
-    expect(getComputedStyle(label).color).toBe('rgb(255, 255, 255)');
+    expect(getComputedStyle(label).color).toBe('rgb(54, 91, 140)');
     fixture.destroy();
     discardPeriodicTasks();
   }));

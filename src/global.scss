@@ -31,11 +31,11 @@ app-task-text-editor .tagify {
   --tags-border-color: transparent;
   --tags-hover-border-color: transparent;
   --tags-focus-border-color: var(--ion-color-primary);
-  --tag-bg: var(--ion-color-primary, #0054e9);
-  --tag-hover: var(--ion-color-primary-shade, #004acd);
-  --tag-text-color: #fff;
+  --tag-bg: #e7effa;
+  --tag-hover: #d4e2f5;
+  --tag-text-color: #365b8c;
   --tag-text-color--edit: var(--ion-text-color, #000);
-  --tag-remove-btn-color: #fff;
+  --tag-remove-btn-color: #365b8c;
   --tag-pad: 2px 6px;
   --placeholder-color: var(--ion-color-medium);
   width: 100%;
