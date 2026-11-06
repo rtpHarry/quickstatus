@@ -30,6 +30,7 @@ import {
   reorderThreeOutline,
 } from 'ionicons/icons';
 import { KeyboardShortcutsComponent } from './ui/keyboard-shortcuts/keyboard-shortcuts.component';
+import { SettingsComponent } from './ui/settings/settings.component';
 import { TaskListComponent } from './ui/task-list/task-list.component';
 import { ProjectStatsBarComponent } from './ui/project-stats-bar/project-stats-bar.component';
 import { ManageDataAction, ManageDataMenuComponent } from './ui/manage-data-menu/manage-data-menu.component';
@@ -87,6 +88,7 @@ interface DeletedTaskEntry {
     ManageDataMenuComponent,
     ReplaceProjectDialogComponent,
     KeyboardShortcutsComponent,
+    SettingsComponent,
   ],
 })
 export class HomePage implements OnInit {
