@@ -43,10 +43,11 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
   it('persists the prefix upgrade on load without creating task activity', async () => {
     const initial = await service.initialize();
     const id = initial.projects[0].id;
-    await service.setProjectTasks(id, '❌ [M] Work [RTP] [id:1]');
+    await service.setProjectTasks(id, '❌ [M] Work [RTP] [id:1]\n❌ Heading 🏷️ [id:2]');
     const before = await service.exportBackup();
     const upgraded = await service.initialize();
-    expect(upgraded.tasks[id]).toBe('❌ @M Work [RTP] [id:1]');
+    expect(upgraded.tasks[id]).toBe('❌ @M Work [RTP] [id:1]\n❌ Heading 🏷️ [id:2]');
+    expect(parseTasksString(upgraded.tasks[id])[1].sectionHeading).toBeTrue();
     expect((await service.initialize()).tasks[id]).toBe(upgraded.tasks[id]);
     const after = await service.exportBackup();
     expect(after.events).toEqual(before.events);

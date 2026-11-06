@@ -12,11 +12,13 @@ import {
 } from '@angular/core';
 import { Task, taskAgeInDays } from '../task-list/task-list.utils';
 import { TaskTextEditorComponent } from '../task-text-editor/task-text-editor.component';
+import { FormsModule } from '@angular/forms';
 import {
   IonButton,
   IonCol,
   IonGrid,
   IonIcon,
+  IonInput,
   IonItem,
   IonRow,
 } from '@ionic/angular/standalone';
@@ -34,6 +36,8 @@ import { lockClosedOutline, lockOpenOutline, textOutline } from 'ionicons/icons'
     IonCol,
     CommonModule,
     TaskTextEditorComponent,
+    FormsModule,
+    IonInput,
     IonGrid,
     IonIcon,
     IonRow,
@@ -43,7 +47,8 @@ import { lockClosedOutline, lockOpenOutline, textOutline } from 'ionicons/icons'
 export class TaskItemComponent implements OnInit, OnDestroy {
   @Input() task!: Task;
   @Output() taskChange = new EventEmitter<Task>();
-  @ViewChild(TaskTextEditorComponent) input!: TaskTextEditorComponent;
+  @ViewChild(TaskTextEditorComponent) input?: TaskTextEditorComponent;
+  @ViewChild(IonInput) headingInput?: IonInput;
   private ageRefreshTimer?: ReturnType<typeof setInterval>;
 
   get ageBadge(): { text: string; label: string } | null {
@@ -84,7 +89,12 @@ export class TaskItemComponent implements OnInit, OnDestroy {
   }
 
   async focusInput(): Promise<void> {
-    await this.input.focus();
+    if (this.headingInput) {
+      await this.headingInput.getInputElement();
+      await this.headingInput.setFocus();
+    } else {
+      await this.input?.focus();
+    }
   }
 
   private updateTask(change: Partial<Task>) {

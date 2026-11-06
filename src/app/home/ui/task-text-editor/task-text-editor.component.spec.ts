@@ -77,6 +77,8 @@ describe('Task text tag editor', () => {
     tick(200);
     expect(tagify.DOM.dropdown.textContent).toContain('RTP');
     expect(tagify.DOM.dropdown.textContent).toContain('M');
+    const dropdownContent = tagify.DOM.dropdown.querySelector('.tagify__dropdown__wrapper')!;
+    expect(getComputedStyle(dropdownContent).backgroundColor).toBe('rgb(255, 255, 255)');
     const rowKey = spyOn(fixture.componentInstance.editorKeydown, 'emit');
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
     tick(100);
@@ -106,6 +108,23 @@ describe('Task text tag editor', () => {
     editor().DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, bubbles: true, cancelable: true }));
     tick(100);
     expect(rowKey).toHaveBeenCalledTimes(1);
+  }));
+
+  it('blocks browser line-break input and flattens multiline paste', fakeAsync(() => {
+    fixture.detectChanges();
+    tick(100);
+    for (const inputType of ['insertParagraph', 'insertLineBreak']) {
+      const event = new InputEvent('beforeinput', { inputType, bubbles: true, cancelable: true });
+      editor().DOM.input.dispatchEvent(event);
+      expect(event.defaultPrevented).toBeTrue();
+    }
+    typeText('Work ');
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/plain', 'first\nsecond');
+    editor().DOM.input.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
+    tick(200);
+    expect(editor().DOM.input.textContent).toContain('first second');
+    expect(editor().DOM.input.getAttribute('aria-multiline')).toBe('false');
   }));
 
   it('allows Backspace to enter tag editing without invoking row shortcuts', fakeAsync(() => {

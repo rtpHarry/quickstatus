@@ -43,6 +43,7 @@ export class TaskTextEditorComponent implements AfterViewInit {
     dropdown: { enabled: 0, position: 'text', highlightFirst: true },
     hooks: {
       beforeKeyDown: (event, { tagify }) => this.handleKeydown(event, tagify),
+      beforePaste: (_event, { pastedText }) => Promise.resolve(pastedText.replace(/[\r\n]+/g, ' ')),
     },
   };
 
@@ -51,6 +52,7 @@ export class TaskTextEditorComponent implements AfterViewInit {
   ngAfterViewInit(): void {
     const editor = this.tagifyService.get('task');
     editor?.DOM.input.setAttribute('aria-label', 'Task text');
+    editor?.DOM.input.setAttribute('aria-multiline', 'false');
     this.ready();
   }
 
@@ -68,10 +70,17 @@ export class TaskTextEditorComponent implements AfterViewInit {
     }
   }
 
+  preventLineBreak(event: Event): void {
+    if (event instanceof InputEvent && ['insertParagraph', 'insertLineBreak'].includes(event.inputType)) {
+      event.preventDefault();
+    }
+  }
+
   private handleKeydown(event: KeyboardEvent, tagify: Tagify): Promise<void> {
     // Tagify owns suggestion navigation and tag edits; the row owns list shortcuts.
     const editingTag = (event.target as HTMLElement).closest('.tagify__tag');
-    const suggestionsOpen = Boolean(tagify.DOM.dropdown?.parentElement);
+    // A closed dropdown still has a parent in Tagify's detached HTML document.
+    const suggestionsOpen = document.body.contains(tagify.DOM.dropdown);
     if (event.isComposing || editingTag || (suggestionsOpen && ['Enter', 'ArrowUp', 'ArrowDown', 'Escape', 'Tab'].includes(event.key))) {
       return Promise.resolve();
     }

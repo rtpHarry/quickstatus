@@ -31,28 +31,41 @@ app-task-text-editor .tagify {
   --tags-border-color: transparent;
   --tags-hover-border-color: transparent;
   --tags-focus-border-color: var(--ion-color-primary);
-  --tag-bg: var(--ion-color-light);
-  --tag-hover: var(--ion-color-light-shade);
-  --tag-text-color: var(--ion-text-color);
-  --tag-remove-btn-color: var(--ion-text-color);
+  --tag-bg: var(--ion-color-primary, #0054e9);
+  --tag-hover: var(--ion-color-primary-shade, #004acd);
+  --tag-text-color: #fff;
+  --tag-text-color--edit: var(--ion-text-color, #000);
+  --tag-remove-btn-color: #fff;
+  --tag-pad: 2px 6px;
   --placeholder-color: var(--ion-color-medium);
   width: 100%;
   color: var(--ion-text-color);
   font: inherit;
-  min-height: 44px;
+  height: 44px;
 }
 
-app-task-text-editor .tagify__input {
+app-task-text-editor .tagify.tagify--mix .tagify__input {
   min-width: 0;
-  margin: 5px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  min-height: 0;
+  height: 42px;
+  margin: 0;
+  padding: 7px 0;
+  line-height: 28px;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+app-task-text-editor .tagify__input br {
+  display: none;
 }
 
 .tagify__dropdown {
-  --tagify-dd-bg-color: var(--ion-background-color);
-  --tagify-dd-color-primary: var(--ion-color-primary);
-  --tagify-dd-text-color: var(--ion-text-color);
+  --tagify-dd-bg-color: #fff;
+  --tagify-dd-color-primary: var(--ion-color-primary, #0054e9);
+  --tagify-dd-text-color: #000;
 }
 
 /**
