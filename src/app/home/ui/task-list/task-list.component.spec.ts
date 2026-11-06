@@ -2,6 +2,48 @@ import { TaskListComponent } from './task-list.component';
 import { ProjectActivityMutation } from '../../analytics/task-activity.types';
 import { parseTasksString, Task } from './task-list.utils';
 import { DefaultIterableDiffer } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { ProjectStorageService } from '../../data/project-storage.service';
+
+describe('Rendered new row focus', () => {
+  it('keeps the new editor ready for typing after Enter and save feedback settle', async () => {
+    const display = document.body.style.display;
+    document.body.style.display = 'block';
+    TestBed.configureTestingModule({
+      imports: [TaskListComponent],
+      providers: [{ provide: ProjectStorageService, useValue: {
+        allocateTaskIds: async () => [2],
+        commitTaskActivity: async () => [],
+      } }],
+    });
+    const fixture = TestBed.createComponent(TaskListComponent);
+    try {
+      fixture.componentRef.setInput('projectId', 'test');
+      fixture.componentRef.setInput('tasksString', '❌ Existing [id:1]');
+      fixture.componentInstance.listChange.subscribe((value) => {
+        fixture.componentRef.setInput('tasksString', value);
+      });
+      fixture.detectChanges();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const first = fixture.nativeElement.querySelector('.tagify__input') as HTMLElement;
+      first.focus();
+      expect(document.activeElement).toBe(first);
+      first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      await fixture.componentInstance.flushPendingChanges();
+      fixture.detectChanges();
+      // Let the queued editor and Ionic row initialization settle after creation.
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+      const next = fixture.nativeElement.querySelectorAll('.tagify__input')[1] as HTMLElement;
+      expect(document.activeElement).toBe(next);
+      expect(next.contains(window.getSelection()!.anchorNode)).toBeTrue();
+      document.execCommand('insertText', false, 'New task');
+      expect(next.textContent).toContain('New task');
+    } finally {
+      fixture.destroy();
+      document.body.style.display = display;
+    }
+  });
+});
 
 describe('New task row identities', () => {
   function setup() {

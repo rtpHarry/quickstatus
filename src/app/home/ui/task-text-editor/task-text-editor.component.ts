@@ -53,7 +53,8 @@ export class TaskTextEditorComponent implements AfterViewInit {
     const editor = this.tagifyService.get('task');
     editor?.DOM.input.setAttribute('aria-label', 'Task text');
     editor?.DOM.input.setAttribute('aria-multiline', 'false');
-    this.ready();
+    // Ionic's row elements finish their initial rendering after Angular's view hook.
+    requestAnimationFrame(() => this.ready());
   }
 
   async focus(): Promise<void> {
