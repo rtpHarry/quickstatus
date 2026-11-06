@@ -51,6 +51,32 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     expect((await service.initialize()).tasks[id]).toBe(upgraded.tasks[id]);
     const after = await service.exportBackup();
     expect(after.events).toEqual(before.events);
+    expect(service.autocompleteTags).toEqual(['M']);
+  });
+
+  it('remembers settings without tasks, discovers tags across projects, and rediscovers removed suggestions only on startup', async () => {
+    const initial = await service.initialize();
+    const id = initial.projects[0].id;
+    expect(service.autocompleteTags).toEqual([]);
+    await service.saveAutocompleteTags(['Saved']);
+    await service.setProjectTasks(id, '❌ [RTP] @Client Work [id:1]');
+    await service.createProject({ id: 'other', name: 'Other' });
+    await service.setProjectTasks('other', '✅ @personal Done [id:2]');
+    await service.initialize();
+    expect(service.autocompleteTags).toEqual(jasmine.arrayWithExactContents(['Saved', 'RTP', 'Client', 'personal']));
+
+    const before = await service.exportSnapshot();
+    await service.saveAutocompleteTags(['Saved']);
+    expect(service.autocompleteTags).toEqual(['Saved']);
+    expect(await service.exportSnapshot()).toEqual(before);
+    expect((await service.exportBackup()).metadata['autocompleteTags']).toEqual(['Saved']);
+    await service.initialize();
+    expect(service.autocompleteTags).toContain('Client');
+
+    await service.setProjectTasks(id, '');
+    await service.setProjectTasks('other', '');
+    await service.initialize();
+    expect(service.autocompleteTags).toEqual(jasmine.arrayWithExactContents(['Saved', 'RTP', 'Client', 'personal']));
   });
 
   it('migrates legacy project-name keys without removing the source', async () => {

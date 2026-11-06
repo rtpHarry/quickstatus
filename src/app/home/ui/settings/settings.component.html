@@ -4,18 +4,28 @@
   </ion-button>
 </ion-buttons>
 
-<ion-modal #settingsModal trigger="open-settings-modal" aria-label="Settings">
+<ion-modal #settingsModal trigger="open-settings-modal" aria-label="Settings" (willPresent)="open()" (didPresent)="labelTagInput()" [backdropDismiss]="!saving">
   <ng-template>
     <ion-header>
       <ion-toolbar>
         <ion-title>Settings</ion-title>
         <ion-buttons slot="end">
-          <ion-button (click)="settingsModal.dismiss()">Close</ion-button>
+          <ion-button (click)="settingsModal.dismiss()" [disabled]="saving">Cancel</ion-button>
+          <ion-button (click)="save()" [disabled]="saving" [strong]="true">Save</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
-      <p>App settings will appear here.</p>
+      <h2 id="autocomplete-tags-label">Show in autocomplete</h2>
+      <p id="autocomplete-tags-help">Add tags with Enter or a comma. Remove a tag with its × button.</p>
+      <tagify
+        name="autocomplete-tags"
+        [settings]="tagSettings"
+        [(ngModel)]="tags"
+        [disabled]="saving"
+        (add)="sortTags()"
+      ></tagify>
+      <p *ngIf="error" role="alert">{{ error }}</p>
     </ion-content>
   </ng-template>
 </ion-modal>

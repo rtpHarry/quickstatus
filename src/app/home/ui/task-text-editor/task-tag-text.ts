@@ -1,4 +1,4 @@
-export const taskTagSuggestions = ['M', 'RTP'];
+import { replaceTaskTags } from '../../data/task-tags';
 
 // Private-use delimiters keep ordinary bracket notation out of Tagify's parser.
 export const tagDelimiters: [string, string] = ['\uE000', '\uE001'];
@@ -10,10 +10,11 @@ export function sortTaskTagsToStart(mixedText: string, tagValues: string[]): str
   return description ? `${prefix} ${description} ` : `${prefix} `;
 }
 
-export function toTagifyText(text: string): string {
+export function toTagifyText(text: string, suggestions: string[]): string {
   const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return escaped.replace(/(^|\s)@(M|RTP)(?=$|\s|[.,!?;:)])/g, (_match, before: string, value: string) => {
-    return before + tagDelimiters[0] + JSON.stringify({ value, prefix: '@' }) + tagDelimiters[1];
+  const known = new Set(suggestions);
+  return replaceTaskTags(escaped, (value) => {
+    return known.has(value) ? tagDelimiters[0] + JSON.stringify({ value, prefix: '@' }) + tagDelimiters[1] : '@' + value;
   });
 }
 

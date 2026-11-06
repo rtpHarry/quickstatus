@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Subject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { taskRemovalEvents } from '../analytics/task-actions';
 import { applyTaskActivity, dailyMetrics, metricDateRange, rebuildProjectMetrics } from '../analytics/project-metrics';
 import { baselineKey, CommittedProjectActivity, dailySummaryKey, isTaskActivity, isTrackingBaseline, localActivityDate, ProjectActivityMutation, ProjectDailySummary, ProjectTaskProjection, projectionKey, TaskActivity, taskFacts, TaskTrackingBaseline } from '../analytics/task-activity.types';
@@ -7,9 +7,17 @@ import { createEmptyTask, normalizeTaskListIds, parseTasksString, stringifyTasks
 import { idbRequest, openProjectDatabase, projectStoreNames, transactionDone } from './project-storage.database';
 import { LegacyStorageBackup, Project, ProjectStorageBackup, ProjectStorageSnapshot, StoredProject } from './project-storage.types';
 import { upgradeTaskTagPrefixes } from './task-tag-upgrade';
+import { findTaskTags, normalizeTaskTags } from './task-tags';
 
 @Injectable({ providedIn: 'root' })
 export class ProjectStorageService {
+  private readonly autocompleteTagsSubject = new BehaviorSubject<string[]>([]);
+  readonly autocompleteTags$ = this.autocompleteTagsSubject.asObservable();
+
+  get autocompleteTags(): string[] {
+    return [...this.autocompleteTagsSubject.value];
+  }
+
   private readonly projectsKey = 'taskList:projects';
   private readonly legacyKey = 'taskList';
   private readonly taskPrefix = 'taskList:';
@@ -40,6 +48,7 @@ export class ProjectStorageService {
       const db = await this.getDatabase();
       const transaction = db.transaction([...projectStoreNames], 'readwrite');
       const done = transactionDone(transaction);
+      let autocompleteTags: string[];
       try {
         const metadata = transaction.objectStore('metadata');
         const initialized = await idbRequest(metadata.get('initialized'));
@@ -50,7 +59,7 @@ export class ProjectStorageService {
           this.writeBackup(transaction, this.baselineBackup(snapshot));
         }
         await this.normalizeStoredTaskIds(transaction);
-        await this.upgradeStoredTaskTags(transaction);
+        autocompleteTags = await this.upgradeStoredTaskTags(transaction);
         await this.ensureTrackingBaselines(transaction);
         await this.ensureProjectMetrics(transaction);
         await done;
@@ -59,6 +68,7 @@ export class ProjectStorageService {
         await done.catch(() => undefined);
         throw error;
       }
+      this.autocompleteTagsSubject.next(autocompleteTags);
       return this.readSnapshot(db);
     });
   }
@@ -71,15 +81,30 @@ export class ProjectStorageService {
   }
 
   /** Idempotent load-time scan also handles lists restored from older backups. */
-  private async upgradeStoredTaskTags(transaction: IDBTransaction): Promise<void> {
+  private async upgradeStoredTaskTags(transaction: IDBTransaction): Promise<string[]> {
     const lists = transaction.objectStore('lists');
+    const metadata = transaction.objectStore('metadata');
+    const saved: unknown = await idbRequest(metadata.get('autocompleteTags'));
+    const tags = Array.isArray(saved) ? saved.filter((tag): tag is string => typeof tag === 'string') : [];
     const rows = await idbRequest<{ projectId: string; tasks: string }[]>(lists.getAll());
     for (const row of rows) {
       const tasks = upgradeTaskTagPrefixes(row.tasks);
+      tags.push(...findTaskTags(tasks));
       if (tasks !== row.tasks) {
         lists.put({ projectId: row.projectId, tasks });
       }
     }
+    const normalized = normalizeTaskTags(tags);
+    metadata.put(normalized, 'autocompleteTags');
+    return normalized;
+  }
+
+  async saveAutocompleteTags(tags: string[]): Promise<void> {
+    const normalized = normalizeTaskTags(tags);
+    await this.write(['metadata'], (transaction) => {
+      transaction.objectStore('metadata').put(normalized, 'autocompleteTags');
+    });
+    this.autocompleteTagsSubject.next(normalized);
   }
 
   /** Reservations commit before returning; gaps are intentional after cancelled actions. */

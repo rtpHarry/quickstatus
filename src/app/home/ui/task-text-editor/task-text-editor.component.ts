@@ -2,7 +2,9 @@ import { AfterViewInit, ChangeDetectionStrategy, Component, EventEmitter, Input,
 import { FormsModule } from '@angular/forms';
 import Tagify, { TagifySettings } from '@yaireo/tagify';
 import { TagifyComponent, TagifyService } from 'ngx-tagify';
-import { fromTagifyText, sortTaskTagsToStart, tagDelimiters, taskTagSuggestions, toTagifyText } from './task-tag-text';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ProjectStorageService } from '../../data/project-storage.service';
+import { fromTagifyText, sortTaskTagsToStart, tagDelimiters, toTagifyText } from './task-tag-text';
 
 @Component({
   selector: 'app-task-text-editor',
@@ -17,7 +19,7 @@ export class TaskTextEditorComponent implements AfterViewInit {
   @Input() set text(value: string) {
     if (value !== this.currentText) {
       this.currentText = value;
-      this.editorValue = toTagifyText(value);
+      this.editorValue = toTagifyText(value, this.storage.autocompleteTags);
     }
   }
   @Output() textChange = new EventEmitter<string>();
@@ -35,7 +37,7 @@ export class TaskTextEditorComponent implements AfterViewInit {
     mode: 'mix',
     pattern: /@/,
     mixTagsInterpolator: tagDelimiters,
-    whitelist: [...taskTagSuggestions],
+    whitelist: [],
     enforceWhitelist: true,
     duplicates: true,
     editTags: false,
@@ -48,7 +50,19 @@ export class TaskTextEditorComponent implements AfterViewInit {
     },
   };
 
-  constructor(private tagifyService: TagifyService) {}
+  constructor(private tagifyService: TagifyService, private storage: ProjectStorageService) {
+    this.storage.autocompleteTags$.pipe(takeUntilDestroyed()).subscribe((tags) => {
+      this.settings.whitelist = [...tags];
+      this.editorValue = toTagifyText(this.currentText, tags);
+      const editor = this.tagifyService.get('task');
+      if (editor) {
+        editor.whitelist = [...tags];
+        editor.dropdown.hide(true);
+        editor.loadOriginalValues(this.editorValue);
+        this.tagInput.value = editor.getMixedTagsAsString();
+      }
+    });
+  }
 
   ngAfterViewInit(): void {
     const editor = this.tagifyService.get('task');
@@ -87,7 +101,7 @@ export class TaskTextEditorComponent implements AfterViewInit {
         return;
       }
       const text = sortTaskTagsToStart(editor.getMixedTagsAsString(), editor.value.map((tag) => tag.value));
-      editor.loadOriginalValues(toTagifyText(text));
+      editor.loadOriginalValues(toTagifyText(text, this.storage.autocompleteTags));
       // Report a view change through the wrapper so ngModel doesn't reload the DOM.
       this.tagInput.value = editor.getMixedTagsAsString();
       void this.focus();

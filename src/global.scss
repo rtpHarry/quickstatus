@@ -68,6 +68,15 @@ app-task-text-editor .tagify__input br {
   --tagify-dd-text-color: #000;
 }
 
+app-settings .tagify {
+  width: 100%;
+  min-height: 100px;
+  align-content: flex-start;
+  --tags-focus-border-color: var(--ion-color-primary);
+  --tag-bg: #e7effa;
+  --tag-text-color: #365b8c;
+}
+
 /**
  * Ionic Dark Mode
  * -----------------------------------------------------

@@ -1,16 +1,31 @@
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { TagifyService } from 'ngx-tagify';
 import { TaskTextEditorComponent } from './task-text-editor.component';
+import { BehaviorSubject } from 'rxjs';
+import { ProjectStorageService } from '../../data/project-storage.service';
 
 describe('Task text tag editor', () => {
   let fixture: ComponentFixture<TaskTextEditorComponent>;
   let originalDisplay: string;
+  let suggestions: BehaviorSubject<string[]>;
 
   beforeEach(() => {
     // Ionic hides the body until its app hydrates; this isolated fixture has no IonApp.
     originalDisplay = document.body.style.display;
     document.body.style.display = 'block';
-    TestBed.configureTestingModule({ imports: [TaskTextEditorComponent] });
+    suggestions = new BehaviorSubject(['M', 'RTP']);
+    TestBed.configureTestingModule({
+      imports: [TaskTextEditorComponent],
+      providers: [{
+        provide: ProjectStorageService,
+        useValue: {
+          autocompleteTags$: suggestions.asObservable(),
+          get autocompleteTags() {
+            return suggestions.value;
+          },
+        },
+      }],
+    });
     fixture = TestBed.createComponent(TaskTextEditorComponent);
   });
 
@@ -35,6 +50,23 @@ describe('Task text tag editor', () => {
     selection.addRange(range);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }
+
+  it('refreshes dynamic suggestions and renders removed tags as plain text without changing the task', fakeAsync(() => {
+    suggestions.next(['Client', 'personal']);
+    fixture.componentRef.setInput('text', '@Client Work @personal');
+    fixture.detectChanges();
+    tick(100);
+    expect(editor().getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['Client', 'personal']);
+    const changed = spyOn(fixture.componentInstance.textChange, 'emit');
+
+    suggestions.next(['personal']);
+    fixture.detectChanges();
+    tick(200);
+    expect(editor().whitelist).toEqual(['personal']);
+    expect(editor().getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['personal']);
+    expect(editor().DOM.input.textContent).toContain('@Client Work');
+    expect(changed).not.toHaveBeenCalled();
+  }));
 
   it('loads known @ tags, preserving brackets, emails, repeated tags and literal HTML', fakeAsync(() => {
     const text = '@M @M Task [M] [[RTP]] a@M.com <b> & @RTP';
