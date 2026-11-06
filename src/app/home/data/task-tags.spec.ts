@@ -1,5 +1,5 @@
 import { findTaskTags, normalizeTaskTags } from './task-tags';
-import { fromTagifyText, toTagifyText } from '../ui/task-text-editor/task-tag-text';
+import { fromTagifyText, tagDelimiters, toTagifyText } from '../ui/task-text-editor/task-tag-text';
 
 describe('Dynamic task tags', () => {
   it('discovers distinct tags with punctuation and unicode, excluding emails and bracket metadata', () => {
@@ -20,6 +20,25 @@ describe('Dynamic task tags', () => {
     expect(mixed).toContain('&lt;b&gt;');
     expect(fromTagifyText(toTagifyText('@Client Work @other', []))).toBe('@Client Work @other');
   });
+
+  for (const text of [
+    'lets check out @matthew and things',
+    '@M Work @matthew',
+    '@M, @matthew',
+    '@unknown @matthew',
+    '<b> @matthew',
+  ]) {
+    it(`restores only leading known tags in ${text}`, () => {
+      const mixed = toTagifyText(text, ['M', 'MATTHEW']);
+      expect(mixed).toContain('@matthew');
+      expect(mixed).not.toContain('"value":"MATTHEW"');
+      if (text.startsWith('@M')) {
+        expect(mixed).toContain(tagDelimiters[0]);
+      } else {
+        expect(mixed).not.toContain(tagDelimiters[0]);
+      }
+    });
+  }
 
   it('matches configured tags regardless of casing and serializes accepted tags in uppercase', () => {
     const mixed = toTagifyText('@client @ClIeNt @Other a@client.com', ['Client']);

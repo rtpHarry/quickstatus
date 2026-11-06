@@ -196,10 +196,10 @@ describe('Task text tag editor', () => {
 
   it('refreshes dynamic suggestions and renders removed tags as plain text without changing the task', fakeAsync(() => {
     suggestions.next(['Client', 'personal']);
-    fixture.componentRef.setInput('text', '@CLIENT Work @PERSONAL');
+    fixture.componentRef.setInput('text', '@PERSONAL @CLIENT Work');
     fixture.detectChanges();
     tick(100);
-    expect(editor().getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['CLIENT', 'PERSONAL']);
+    expect(editor().getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['PERSONAL', 'CLIENT']);
     const changed = spyOn(fixture.componentInstance.textChange, 'emit');
 
     suggestions.next(['personal']);
@@ -217,14 +217,42 @@ describe('Task text tag editor', () => {
     const changed = spyOn(fixture.componentInstance.textChange, 'emit');
     fixture.detectChanges();
     tick(100);
-    expect(editor().getTagElms().length).toBe(3);
+    expect(editor().getTagElms().length).toBe(2);
     expect(editor().DOM.input.querySelector('b')).toBeNull();
     expect(editor().DOM.input.textContent).toContain('<b> &');
     expect(changed).not.toHaveBeenCalled();
   }));
 
+  it('keeps an escaped inline mention as text after reload and suggestion refresh', fakeAsync(() => {
+    suggestions.next(['MATTHEW', 'RTP']);
+    fixture.detectChanges();
+    tick(100);
+    typeText('lets check out @matthew');
+    tick(200);
+    editor().DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    tick(100);
+    expect(document.body.contains(editor().DOM.dropdown)).toBeFalse();
+    document.execCommand('insertText', false, ' and things');
+    tick(200);
+    const text = fromTagifyText(fixture.componentInstance.editorValue);
+    expect(text).toBe('lets check out @matthew and things');
+
+    fixture.destroy();
+    fixture = TestBed.createComponent(TaskTextEditorComponent);
+    fixture.componentRef.setInput('text', text);
+    fixture.detectChanges();
+    tick(100);
+    expect(editor().getTagElms().length).toBe(0);
+    expect(editor().DOM.input.textContent).toBe(text);
+    suggestions.next(['MATTHEW', 'RTP', 'OTHER']);
+    fixture.detectChanges();
+    tick(200);
+    expect(editor().getTagElms().length).toBe(0);
+    expect(editor().DOM.input.textContent).toBe(text);
+  }));
+
   it('moves the caret to the end on each programmatic focus', async () => {
-    fixture.componentRef.setInput('text', '@M Work @RTP');
+    fixture.componentRef.setInput('text', '@M @RTP Work');
     fixture.detectChanges();
     await fixture.componentInstance.focus();
     expect(editor().getTagElms().length).toBe(2);
@@ -268,14 +296,15 @@ describe('Task text tag editor', () => {
   }));
 
   it('sorts all accepted tags at the start and leaves the focused caret at the end', fakeAsync(() => {
-    fixture.componentRef.setInput('text', 'Work @RTP details [M] a@M.com <b>');
+    fixture.componentRef.setInput('text', '@RTP Work details [M] a@M.com <b>');
     fixture.detectChanges();
     tick(100);
     const tagify = editor();
     const input = tagify.DOM.input;
     input.focus();
     const range = document.createRange();
-    range.setStart(input.firstChild!, 5);
+    const description = Array.from(input.childNodes).find((node) => node.textContent?.includes('Work details'))!;
+    range.setStart(description, description.textContent!.indexOf('details'));
     range.collapse(true);
     const selection = window.getSelection()!;
     selection.removeAllRanges();

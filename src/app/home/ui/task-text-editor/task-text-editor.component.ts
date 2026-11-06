@@ -5,8 +5,8 @@ import Tagify, { TagifySettings } from '@yaireo/tagify';
 import { TagifyComponent, TagifyService } from 'ngx-tagify';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ProjectStorageService } from '../../data/project-storage.service';
-import { findTaskTags, normalizeTaskTag, normalizeTaskTags, taskTagPattern } from '../../data/task-tags';
-import { fromTagifyText, sortTaskTagsToStart, tagDelimiters, toTagifyText } from './task-tag-text';
+import { normalizeTaskTag, normalizeTaskTags, taskTagPattern } from '../../data/task-tags';
+import { fromTagifyText, leadingTaskTags, sortTaskTagsToStart, tagDelimiters, toTagifyText } from './task-tag-text';
 
 @Component({
   selector: 'app-task-text-editor',
@@ -90,7 +90,7 @@ export class TaskTextEditorComponent implements AfterViewInit {
       }
       editor.whitelist = [...tags];
       const currentTags = new Set(editor.value.map((tag) => tag.value));
-      const expectedTags = new Set(findTaskTags(this.currentText).filter((tag) => tags.includes(tag)));
+      const expectedTags = new Set(leadingTaskTags(this.currentText, tags).map((tag) => tag.value));
       if (currentTags.size === expectedTags.size && [...currentTags].every((tag) => expectedTags.has(tag))) {
         return;
       }

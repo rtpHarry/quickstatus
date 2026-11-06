@@ -1,4 +1,4 @@
-import { normalizeTaskTag, normalizeTaskTags, replaceTaskTags } from '../../data/task-tags';
+import { normalizeTaskTag, normalizeTaskTags } from '../../data/task-tags';
 
 // Private-use delimiters keep ordinary bracket notation out of Tagify's parser.
 export const tagDelimiters: [string, string] = ['\uE000', '\uE001'];
@@ -10,13 +10,31 @@ export function sortTaskTagsToStart(mixedText: string, tagValues: string[]): str
   return description ? `${prefix} ${description} ` : `${prefix} `;
 }
 
+/** Only known tags in the uninterrupted prefix are restored as accepted tags. */
+export function leadingTaskTags(text: string, suggestions: string[]): { value: string; start: number; end: number }[] {
+  const known = new Set(normalizeTaskTags(suggestions));
+  const pattern = /[ \t\u00A0]*@([\p{L}\p{N}_][\p{L}\p{N}_-]*)(?=$|\s|[.,!?;:)])/uy;
+  const tags: { value: string; start: number; end: number }[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    const value = normalizeTaskTag(match[1]);
+    if (!known.has(value)) {
+      break;
+    }
+    tags.push({ value, start: pattern.lastIndex - match[1].length - 1, end: pattern.lastIndex });
+  }
+  return tags;
+}
+
 export function toTagifyText(text: string, suggestions: string[]): string {
   const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const known = new Set(normalizeTaskTags(suggestions));
-  return replaceTaskTags(escaped, (value) => {
-    const normalized = normalizeTaskTag(value);
-    return known.has(normalized) ? tagDelimiters[0] + JSON.stringify({ value: normalized, prefix: '@' }) + tagDelimiters[1] : '@' + value;
-  });
+  let mixed = '';
+  let end = 0;
+  for (const tag of leadingTaskTags(escaped, suggestions)) {
+    mixed += escaped.slice(end, tag.start) + tagDelimiters[0] + JSON.stringify({ value: tag.value, prefix: '@' }) + tagDelimiters[1];
+    end = tag.end;
+  }
+  return mixed + escaped.slice(end);
 }
 
 export function fromTagifyText(text: string): string {
