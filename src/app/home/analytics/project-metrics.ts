@@ -15,7 +15,7 @@ export function baselineProjection(baseline: TaskTrackingBaseline): ProjectTaskP
     facts: { ...facts }, arrivalDate: creationDate(facts.created), deleted: false,
   });
   return {
-    schemaVersion: 1, reducerVersion: 3, projectId: baseline.projectId, lastEventId: 0,
+    schemaVersion: 1, reducerVersion: 4, projectId: baseline.projectId, lastEventId: 0,
     tasks,
   };
 }
@@ -41,7 +41,7 @@ export function applyTaskActivity(
     if (event.projectId !== projection.projectId) throw new Error('Analytics project mismatch');
     if (event.id <= projection.lastEventId) continue;
     const day = days.get(event.localDate) ?? closingSummary(projection, event.localDate);
-    const task = projection.tasks[event.taskId] ?? {
+    const task: ProjectTaskProjection['tasks'][number] = projection.tasks[event.taskId] ?? {
       facts: event.before ?? event.after!, arrivalDate: creationDate((event.before ?? event.after!).created), deleted: false,
     };
     if (event.type === 'entered' && event.after && eligible(event.after)) {
@@ -51,12 +51,16 @@ export function applyTaskActivity(
     if (event.type === 'status-changed' && event.before && event.after
       && eligible(event.before) && eligible(event.after)) {
       if (event.before.status !== '✅' && event.after.status === '✅') {
+        task.completedOn = event.localDate;
         if (!day.completionCredits.some((credit) => credit.taskId === event.taskId)) {
           day.completionCredits.push({ taskId: event.taskId, isNew: task.arrivalDate === event.localDate });
         }
       } else if (event.before.status === '✅' && event.after.status !== '✅') {
         day.completionCredits = day.completionCredits.filter((credit) => credit.taskId !== event.taskId);
       }
+    }
+    if (event.after && event.after.status !== '✅') {
+      delete task.completedOn;
     }
     // Keep identity credits for undo; a drop excludes additions, never past completions.
     const leavesTaskList = event.type === 'deleted'

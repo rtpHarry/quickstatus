@@ -108,12 +108,12 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
       const tx = db.transaction('analytics', 'readwrite');
       const store = tx.objectStore('analytics');
       const request = store.get(`projection:${projectId}`);
-      request.onsuccess = () => store.put({ ...request.result, reducerVersion: 2 }, `projection:${projectId}`);
+      request.onsuccess = () => store.put({ ...request.result, reducerVersion: 3 }, `projection:${projectId}`);
       tx.oncomplete = () => resolve();
       tx.onabort = () => reject(tx.error);
     });
     await service.initialize();
-    expect((await service.getTaskProjection(projectId))?.reducerVersion).toBe(3);
+    expect((await service.getTaskProjection(projectId))?.reducerVersion).toBe(4);
     await service.commitTaskActivity({ projectId, tasks: '', events: [{ taskId: 1,
       type: 'deleted', source: 'normal', before: facts, after: null }] });
     expect(await service.getDailySummary(projectId, '2026-01-01')).toEqual(jasmine.objectContaining({ created: 0, remaining: 1 }));

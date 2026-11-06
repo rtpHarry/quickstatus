@@ -25,6 +25,29 @@ describe('project task metrics', () => {
     }));
   });
 
+  it('records completion dates, clears them on reopening, and uses the next completion date', () => {
+    const initial = baseline([{ taskId: 1, facts: facts() }, { taskId: 2, facts: facts('✅') }]);
+    const completed = event(1, 1, 'status-changed', facts(), facts('✅'), '2026-10-02');
+    const reopened = event(2, 1, 'status-changed', facts('✅'), facts('☑️'), '2026-10-03');
+    const recompleted = event(3, 1, 'status-changed', facts('☑️'), facts('✅'), '2026-10-04');
+    expect(rebuildProjectMetrics(initial, [completed]).projection.tasks[1].completedOn).toBe('2026-10-02');
+    expect(rebuildProjectMetrics(initial, [completed, reopened]).projection.tasks[1].completedOn).toBeUndefined();
+    const result = rebuildProjectMetrics(initial, [completed, reopened, recompleted]);
+    expect(result.projection.tasks[1].completedOn).toBe('2026-10-04');
+    expect(result.projection.tasks[2].completedOn).toBeUndefined();
+  });
+
+  it('preserves known completion dates through deletion and undo, without dating pasted completions', () => {
+    const result = rebuildProjectMetrics(baseline([{ taskId: 1, facts: facts() }]), [
+      event(1, 1, 'status-changed', facts(), facts('✅')),
+      event(2, 1, 'deleted', facts('✅'), null, '2026-10-03'),
+      event(3, 1, 'restored', null, facts('✅'), '2026-10-04'),
+      { ...event(4, 2, 'entered', null, facts('✅'), '2026-10-04'), source: 'paste' },
+    ]);
+    expect(result.projection.tasks[1].completedOn).toBe('2026-10-01');
+    expect(result.projection.tasks[2].completedOn).toBeUndefined();
+  });
+
   it('reverses only same-day credits and counts repeated completions once', () => {
     const events = [event(1, 1, 'status-changed', facts(), facts('✅')),
       event(2, 1, 'status-changed', facts('✅'), facts('☑️')),
