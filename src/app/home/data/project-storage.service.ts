@@ -107,6 +107,19 @@ export class ProjectStorageService {
     this.autocompleteTagsSubject.next(normalized);
   }
 
+  async addAutocompleteTags(tags: string[]): Promise<void> {
+    const additions = normalizeTaskTags(tags);
+    const merged = await this.write(['metadata'], async (transaction) => {
+      const metadata = transaction.objectStore('metadata');
+      const saved: unknown = await idbRequest(metadata.get('autocompleteTags'));
+      const existing = Array.isArray(saved) ? saved.filter((tag): tag is string => typeof tag === 'string') : [];
+      const normalized = normalizeTaskTags([...existing, ...additions]);
+      metadata.put(normalized, 'autocompleteTags');
+      return normalized;
+    });
+    this.autocompleteTagsSubject.next(merged);
+  }
+
   /** Reservations commit before returning; gaps are intentional after cancelled actions. */
   allocateTaskIds(count: number): Promise<number[]> {
     return this.write(['metadata'], (transaction) => this.reserveTaskIds(transaction, count));

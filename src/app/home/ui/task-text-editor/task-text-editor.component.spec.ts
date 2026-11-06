@@ -8,18 +8,23 @@ describe('Task text tag editor', () => {
   let fixture: ComponentFixture<TaskTextEditorComponent>;
   let originalDisplay: string;
   let suggestions: BehaviorSubject<string[]>;
+  let addSuggestions: jasmine.Spy;
 
   beforeEach(() => {
     // Ionic hides the body until its app hydrates; this isolated fixture has no IonApp.
     originalDisplay = document.body.style.display;
     document.body.style.display = 'block';
     suggestions = new BehaviorSubject(['M', 'RTP']);
+    addSuggestions = jasmine.createSpy('addAutocompleteTags').and.callFake(async (tags: string[]) => {
+      suggestions.next([...new Set([...suggestions.value, ...tags])]);
+    });
     TestBed.configureTestingModule({
       imports: [TaskTextEditorComponent],
       providers: [{
         provide: ProjectStorageService,
         useValue: {
           autocompleteTags$: suggestions.asObservable(),
+          addAutocompleteTags: addSuggestions,
           get autocompleteTags() {
             return suggestions.value;
           },
@@ -50,6 +55,104 @@ describe('Task text tag editor', () => {
     selection.addRange(range);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }
+
+  it('accepts a new mixed-case inline tag, remembers it and keeps the caret ready for task text', fakeAsync(() => {
+    fixture.detectChanges();
+    tick(100);
+    const changed = spyOn(fixture.componentInstance.textChange, 'emit');
+    typeText('Work @neW-tag');
+    tick(200);
+    expect(editor().DOM.dropdown.textContent).toContain('NEW TAG: NEW-TAG');
+    expect(addSuggestions).not.toHaveBeenCalled();
+    const rowKey = spyOn(fixture.componentInstance.editorKeydown, 'emit');
+    editor().DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    tick(300);
+    fixture.detectChanges();
+    tick(100);
+
+    expect(rowKey).not.toHaveBeenCalled();
+    expect(editor().getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['NEW-TAG']);
+    expect(addSuggestions).toHaveBeenCalledOnceWith(['NEW-TAG']);
+    expect(suggestions.value).toContain('NEW-TAG');
+    expect(changed.calls.mostRecent().args[0]).toBe('@NEW-TAG Work ');
+    document.execCommand('insertText', false, 'next');
+    tick(200);
+    expect(changed.calls.mostRecent().args[0]).toBe('@NEW-TAG Work next');
+  }));
+
+  it('creates the first tag when autocomplete is empty', fakeAsync(() => {
+    suggestions.next([]);
+    fixture.detectChanges();
+    tick(100);
+    typeText('@first');
+    tick(200);
+    editor().DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    tick(300);
+    expect(editor().value.map((tag) => tag.value)).toEqual(['FIRST']);
+    expect(addSuggestions).toHaveBeenCalledOnceWith(['FIRST']);
+  }));
+
+  it('previews a new uppercase tag first but highlights the closest existing match for Enter', fakeAsync(() => {
+    suggestions.next(['ASO', 'SOKA']);
+    fixture.detectChanges();
+    tick(100);
+    typeText('@so');
+    tick(200);
+    const options = Array.from(editor().DOM.dropdown.querySelectorAll('[role="option"]'));
+    expect(options.map((option) => option.textContent)).toEqual(['NEW TAG: SO', 'SOKA', 'ASO']);
+    expect(options[1].getAttribute('aria-selected')).toBe('true');
+
+    editor().DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    tick(300);
+    expect(editor().value.map((tag) => tag.value)).toEqual(['SOKA']);
+    expect(addSuggestions).not.toHaveBeenCalled();
+  }));
+
+  it('selects the new-tag preview with Down then Enter even when several existing tags match', fakeAsync(() => {
+    suggestions.next(['ASO', 'SOKA']);
+    fixture.detectChanges();
+    tick(100);
+    typeText('@so');
+    tick(200);
+    const input = editor().DOM.input;
+    const rowKey = spyOn(fixture.componentInstance.editorKeydown, 'emit');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    tick(100);
+    expect(editor().DOM.dropdown.querySelector('[aria-selected="true"]')?.textContent).toBe('NEW TAG: SO');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    tick(300);
+    expect(editor().value.map((tag) => tag.value)).toEqual(['SO']);
+    expect(addSuggestions).toHaveBeenCalledOnceWith(['SO']);
+    expect(rowKey).not.toHaveBeenCalled();
+  }));
+
+  it('keeps matching saved suggestions and avoids remembering a casing duplicate', fakeAsync(() => {
+    fixture.detectChanges();
+    tick(100);
+    typeText('@rt');
+    tick(200);
+    expect(editor().DOM.dropdown.textContent).toContain('RTP');
+    typeText('@rtp');
+    tick(200);
+    expect(editor().DOM.dropdown.textContent).not.toContain('NEW TAG:');
+    editor().DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    tick(300);
+    expect(editor().value.map((tag) => tag.value)).toEqual(['RTP']);
+    expect(addSuggestions).not.toHaveBeenCalled();
+  }));
+
+  it('keeps a new tag on its task and reports an autocomplete save failure', fakeAsync(() => {
+    addSuggestions.and.rejectWith(new Error('Storage unavailable'));
+    fixture.detectChanges();
+    tick(100);
+    typeText('@new');
+    tick(200);
+    editor().DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    tick(300);
+    fixture.detectChanges();
+    expect(editor().value.map((tag) => tag.value)).toEqual(['NEW']);
+    expect(fixture.nativeElement.querySelector('[role="alert"]').textContent).toContain('could not save');
+  }));
 
   it('refreshes dynamic suggestions and renders removed tags as plain text without changing the task', fakeAsync(() => {
     suggestions.next(['Client', 'personal']);
@@ -109,7 +212,7 @@ describe('Task text tag editor', () => {
     fixture.detectChanges();
     tick(100);
     const changed = spyOn(fixture.componentInstance.textChange, 'emit');
-    typeText('Work @R');
+    typeText('Work @RTP');
     tick(200);
     editor().DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     tick(200);
@@ -163,7 +266,7 @@ describe('Task text tag editor', () => {
     fixture.detectChanges();
     tick(100);
     const changed = spyOn(fixture.componentInstance.textChange, 'emit');
-    typeText('@R');
+    typeText('@RTP');
     tick(200);
     editor().DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     tick(200);

@@ -1,16 +1,17 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, EventEmitter, Input, Output, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, Input, Output, ViewChild } from '@angular/core';
+import { NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import Tagify, { TagifySettings } from '@yaireo/tagify';
 import { TagifyComponent, TagifyService } from 'ngx-tagify';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ProjectStorageService } from '../../data/project-storage.service';
-import { normalizeTaskTag, normalizeTaskTags } from '../../data/task-tags';
+import { findTaskTags, normalizeTaskTag, normalizeTaskTags, taskTagPattern } from '../../data/task-tags';
 import { fromTagifyText, sortTaskTagsToStart, tagDelimiters, toTagifyText } from './task-tag-text';
 
 @Component({
   selector: 'app-task-text-editor',
   standalone: true,
-  imports: [FormsModule, TagifyComponent],
+  imports: [FormsModule, NgIf, TagifyComponent],
   providers: [TagifyService],
   templateUrl: './task-text-editor.component.html',
   styleUrls: ['./task-text-editor.component.scss'],
@@ -28,7 +29,9 @@ export class TaskTextEditorComponent implements AfterViewInit {
   @ViewChild(TagifyComponent) private tagInput!: TagifyComponent;
 
   editorValue = '';
+  tagSaveError = '';
   private currentText = '';
+  private newTagShortcut?: { existing: HTMLElement; newTag: HTMLElement };
   private ready!: () => void;
   private readonly editorReady = new Promise<void>((resolve) => {
     this.ready = resolve;
@@ -39,7 +42,8 @@ export class TaskTextEditorComponent implements AfterViewInit {
     pattern: /@/,
     mixTagsInterpolator: tagDelimiters,
     whitelist: [],
-    enforceWhitelist: true,
+    enforceWhitelist: false,
+    validate: (tag) => taskTagPattern.test(tag.value) || 'Use letters, numbers, underscores or hyphens.',
     duplicates: true,
     transformTag: (tag) => {
       tag.value = normalizeTaskTag(tag.value);
@@ -47,25 +51,45 @@ export class TaskTextEditorComponent implements AfterViewInit {
     editTags: false,
     backspace: true,
     placeholder: 'Enter task',
-    dropdown: { enabled: 0, position: 'text', highlightFirst: true },
+    dropdown: { enabled: 0, position: 'text', highlightFirst: true, sortby: 'startsWith' },
+    templates: {
+      dropdownItem: (item) => this.renderSuggestion(item.value),
+    },
+    callbacks: {
+      'dropdown:show': () => this.highlightExistingSuggestion(),
+      'dropdown:hide': () => {
+        this.newTagShortcut = undefined;
+      },
+    },
     hooks: {
       beforeKeyDown: (event, { tagify }) => this.handleKeydown(event, tagify),
       beforePaste: (_event, { pastedText }) => Promise.resolve(pastedText.replace(/[\r\n]+/g, ' ')),
     },
   };
 
-  constructor(private tagifyService: TagifyService, private storage: ProjectStorageService) {
+  constructor(
+    private tagifyService: TagifyService,
+    private storage: ProjectStorageService,
+    private changeDetectorRef: ChangeDetectorRef
+  ) {
     this.storage.autocompleteTags$.pipe(takeUntilDestroyed()).subscribe((tags) => {
       tags = normalizeTaskTags(tags);
       this.settings.whitelist = [...tags];
-      this.editorValue = toTagifyText(this.currentText, tags);
       const editor = this.tagifyService.get('task');
-      if (editor) {
-        editor.whitelist = [...tags];
-        editor.dropdown.hide(true);
-        editor.loadOriginalValues(this.editorValue);
-        this.tagInput.value = editor.getMixedTagsAsString();
+      if (!editor) {
+        this.editorValue = toTagifyText(this.currentText, tags);
+        return;
       }
+      editor.whitelist = [...tags];
+      const currentTags = new Set(editor.value.map((tag) => tag.value));
+      const expectedTags = new Set(findTaskTags(this.currentText).filter((tag) => tags.includes(tag)));
+      if (currentTags.size === expectedTags.size && [...currentTags].every((tag) => expectedTags.has(tag))) {
+        return;
+      }
+      this.editorValue = toTagifyText(this.currentText, tags);
+      editor.dropdown.hide(true);
+      editor.loadOriginalValues(this.editorValue);
+      this.tagInput.value = editor.getMixedTagsAsString();
     });
   }
 
@@ -105,11 +129,21 @@ export class TaskTextEditorComponent implements AfterViewInit {
       if (!editor) {
         return;
       }
-      const text = sortTaskTagsToStart(editor.getMixedTagsAsString(), editor.value.map((tag) => tag.value));
-      editor.loadOriginalValues(toTagifyText(text, this.storage.autocompleteTags));
+      const values = editor.value.map((tag) => tag.value);
+      const known = this.storage.autocompleteTags;
+      const additions = normalizeTaskTags(values).filter((value) => !known.includes(value));
+      const text = sortTaskTagsToStart(editor.getMixedTagsAsString(), values);
+      editor.loadOriginalValues(toTagifyText(text, [...known, ...additions]));
       // Report a view change through the wrapper so ngModel doesn't reload the DOM.
       this.tagInput.value = editor.getMixedTagsAsString();
       void this.focus();
+      if (additions.length > 0) {
+        this.tagSaveError = '';
+        void this.storage.addAutocompleteTags(additions).catch(() => {
+          this.tagSaveError = 'Tag added to task, but could not save it to autocomplete. Please try again.';
+          this.changeDetectorRef.markForCheck();
+        });
+      }
     });
   }
 
@@ -119,11 +153,58 @@ export class TaskTextEditorComponent implements AfterViewInit {
     }
   }
 
+  private renderSuggestion(value: string): string {
+    const normalized = normalizeTaskTag(value);
+    const isNew = !normalizeTaskTags(this.storage.autocompleteTags).includes(normalized);
+    const option = document.createElement('div');
+    option.className = 'tagify__dropdown__item';
+    option.setAttribute('value', value);
+    option.setAttribute('role', 'option');
+    option.tabIndex = 0;
+    option.textContent = isNew ? 'NEW TAG: ' + normalized : normalized;
+    if (isNew) {
+      option.dataset['newTag'] = 'true';
+    }
+    return option.outerHTML;
+  }
+
+  private highlightExistingSuggestion(): void {
+    const editor = this.tagifyService.get('task');
+    if (!editor) {
+      return;
+    }
+    const options = Array.from(editor.DOM.dropdown.querySelectorAll<HTMLElement>('[role="option"]'));
+    const existing = options.find((option) => !option.dataset['newTag']);
+    const newTag = options.find((option) => option.dataset['newTag']);
+    this.newTagShortcut = existing && newTag ? { existing, newTag } : undefined;
+    if (existing) {
+      this.highlightSuggestion(editor, existing);
+    }
+  }
+
+  private highlightSuggestion(editor: Tagify, option: HTMLElement): void {
+    // Tagify exposes this at runtime, but its published typings omit it.
+    const dropdown = editor.dropdown as Tagify['dropdown'] & {
+      highlightOption(element: HTMLElement, adjustScroll: boolean): void;
+    };
+    dropdown.highlightOption(option, false);
+  }
+
   private handleKeydown(event: KeyboardEvent, tagify: Tagify): Promise<void> {
     // Tagify owns suggestion navigation and tag edits; the row owns list shortcuts.
     const editingTag = (event.target as HTMLElement).closest('.tagify__tag');
     // A closed dropdown still has a parent in Tagify's detached HTML document.
     const suggestionsOpen = document.body.contains(tagify.DOM.dropdown);
+    if (!event.isComposing && suggestionsOpen && ['ArrowDown', 'ArrowUp'].includes(event.key)) {
+      const shortcut = this.newTagShortcut;
+      this.newTagShortcut = undefined;
+      if (event.key === 'ArrowDown' && shortcut?.existing.getAttribute('aria-selected') === 'true') {
+        event.preventDefault();
+        event.stopPropagation();
+        this.highlightSuggestion(tagify, shortcut.newTag);
+        return Promise.reject();
+      }
+    }
     if (event.isComposing || editingTag || (suggestionsOpen && ['Enter', 'ArrowUp', 'ArrowDown', 'Escape', 'Tab'].includes(event.key))) {
       return Promise.resolve();
     }

@@ -88,6 +88,19 @@ describe('ProjectStorageService IndexedDB migration and restore', () => {
     expect(localStorage.getItem('taskList:Work')).toBe('☑️ old format');
   });
 
+  it('merges concurrent inline additions without losing existing suggestions or duplicating casing variants', async () => {
+    await service.initialize();
+    await service.saveAutocompleteTags(['Saved']);
+    await Promise.all([
+      service.addAutocompleteTags(['client', 'SAVED']),
+      service.addAutocompleteTags(['personal', 'ClIeNt']),
+    ]);
+    expect(service.autocompleteTags).toEqual(['SAVED', 'CLIENT', 'PERSONAL']);
+    expect((await service.exportBackup()).metadata['autocompleteTags']).toEqual(['SAVED', 'CLIENT', 'PERSONAL']);
+    await service.initialize();
+    expect(service.autocompleteTags).toEqual(['SAVED', 'CLIENT', 'PERSONAL']);
+  });
+
   it('round trips every store, including archived projects, counters and history', async () => {
     const initial = await service.initialize();
     const id = initial.projects[0].id;

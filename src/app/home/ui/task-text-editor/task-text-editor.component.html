@@ -6,3 +6,4 @@
   (add)="onTagAdded()"
   (beforeinput)="preventLineBreak($event)"
 ></tagify>
+<p *ngIf="tagSaveError" role="alert">{{ tagSaveError }}</p>
