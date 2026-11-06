@@ -201,7 +201,21 @@ describe('Task text tag editor', () => {
     expect(editor().DOM.input.getAttribute('aria-multiline')).toBe('false');
   }));
 
-  it('allows Backspace to enter tag editing without invoking row shortcuts', fakeAsync(() => {
+  it('keeps accepted tags non-editable on click and double-click', fakeAsync(() => {
+    fixture.componentRef.setInput('text', '@M Work');
+    fixture.detectChanges();
+    tick(100);
+    const tagify = editor();
+    const label = tagify.getTagElms()[0].querySelector<HTMLElement>('.tagify__tag-text')!;
+    for (const type of ['click', 'dblclick']) {
+      label.dispatchEvent(new MouseEvent(type, { bubbles: true }));
+      tick(100);
+      expect(label.isContentEditable).toBeFalse();
+    }
+    expect(tagify.getTagElms().length).toBe(1);
+  }));
+
+  it('deletes an accepted tag on Backspace instead of editing it', fakeAsync(() => {
     fixture.componentRef.setInput('text', '@M Work');
     fixture.detectChanges();
     tick(100);
@@ -214,13 +228,16 @@ describe('Task text tag editor', () => {
     range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
-    tagify.DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
+    const backspace = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true });
+    tagify.DOM.input.dispatchEvent(backspace);
     tick(100);
-    const label = tag.querySelector<HTMLElement>('.tagify__tag-text')!;
-    expect(label.isContentEditable).toBeTrue();
-    const rowKey = spyOn(fixture.componentInstance.editorKeydown, 'emit');
-    label.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-    tick(100);
-    expect(rowKey).not.toHaveBeenCalled();
+    // Synthetic key events do not perform the browser's default deletion.
+    if (!backspace.defaultPrevented) {
+      document.execCommand('delete');
+    }
+    tick(200);
+    expect(tagify.getTagElms().length).toBe(0);
+    expect(tagify.DOM.input.textContent).toContain('Work');
+    expect(tagify.DOM.input.querySelector('.tagify__tag--editable')).toBeNull();
   }));
 });

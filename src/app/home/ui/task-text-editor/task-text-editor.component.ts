@@ -38,8 +38,8 @@ export class TaskTextEditorComponent implements AfterViewInit {
     whitelist: [...taskTagSuggestions],
     enforceWhitelist: true,
     duplicates: true,
-    editTags: 1,
-    backspace: 'edit',
+    editTags: false,
+    backspace: true,
     placeholder: 'Enter task',
     dropdown: { enabled: 0, position: 'text', highlightFirst: true },
     hooks: {
