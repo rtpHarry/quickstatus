@@ -44,7 +44,9 @@
                   <td [class.new-work-heavy]="row.completedNew > row.completedExisting">
                     {{ row.completedNew }}
                   </td>
-                  <td>{{ row.completedExisting }}</td>
+                  <td [class.existing-work-heavy]="row.completedExisting > row.completedNew">
+                    {{ row.completedExisting }}
+                  </td>
                   <td>{{ row.start }}</td>
                   <td>{{ row.remaining }}</td>
                   <td>
@@ -58,8 +60,9 @@
           </table>
         </div>
         <p class="history-note">Start and End count unfinished tasks. Today's End is the current backlog.
-          New means created that day; Existing means created before that day.
+          New and Existing split completed tasks by whether they were created that day or earlier.
           New is red when more new tasks were completed than existing tasks.
+          Existing is green when more existing tasks were completed than new tasks.
           Change is End minus Start: negative (green) means fewer unfinished tasks, including dropped tasks;
           positive means more unfinished tasks; zero means no progress. Both are red.
           Deleting an unfinished task removes its Added credit; earlier completion credits remain.
