@@ -1,6 +1,49 @@
 import { TaskItemComponent } from './task-item.component';
 import { fakeAsync, TestBed, tick, discardPeriodicTasks } from '@angular/core/testing';
 
+describe('Task age badge', () => {
+  beforeEach(() => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(2026, 10, 6, 12));
+  });
+
+  afterEach(() => {
+    jasmine.clock().uninstall();
+  });
+
+  it('freezes completed age, resumes on reopening, and uses the next completion date', () => {
+    const row = new TaskItemComponent({} as never);
+    row.task = { status: '✅', text: 'Work', created: '2026/11/01' };
+    row.completedOn = '2026-11-03';
+    expect(row.ageBadge).toEqual({ text: '2', label: 'Completed in 2 days' });
+    jasmine.clock().mockDate(new Date(2026, 10, 10, 12));
+    expect(row.ageBadge?.text).toBe('2');
+    row.task = { ...row.task, status: '☑️' };
+    expect(row.ageBadge).toEqual({ text: '9', label: '9 days' });
+    row.task = { ...row.task, status: '✅' };
+    row.completedOn = '2026-11-10';
+    expect(row.ageBadge).toEqual({ text: '9', label: 'Completed in 9 days' });
+  });
+
+  it('hides completed badges with unknown completion or creation dates', () => {
+    const row = new TaskItemComponent({} as never);
+    row.task = { status: '✅', text: 'Old task', created: '2026/11/01' };
+    expect(row.ageBadge).toBeNull();
+    row.completedOn = '2026-11-03';
+    row.task = { ...row.task, created: undefined };
+    expect(row.ageBadge).toBeNull();
+  });
+
+  it('distinguishes same-day completion from an active task created today', () => {
+    const row = new TaskItemComponent({} as never);
+    row.task = { status: '❌', text: 'Work', created: '2026/11/06' };
+    expect(row.ageBadge).toEqual({ text: 'today', label: 'today' });
+    row.task = { ...row.task, status: '✅' };
+    row.completedOn = '2026-11-06';
+    expect(row.ageBadge).toEqual({ text: '0', label: 'Completed the same day' });
+  });
+});
+
 describe('Task item editor shortcuts', () => {
   it('delegates row focus to the editor', async () => {
     const component = new TaskItemComponent({} as never);

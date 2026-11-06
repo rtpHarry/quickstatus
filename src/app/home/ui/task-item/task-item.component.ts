@@ -46,24 +46,36 @@ import { lockClosedOutline, lockOpenOutline, textOutline } from 'ionicons/icons'
 })
 export class TaskItemComponent implements OnInit, OnDestroy {
   @Input() task!: Task;
+  @Input() completedOn?: string;
   @Output() taskChange = new EventEmitter<Task>();
   @ViewChild(TaskTextEditorComponent) input?: TaskTextEditorComponent;
   @ViewChild(IonInput) headingInput?: IonInput;
   private ageRefreshTimer?: ReturnType<typeof setInterval>;
 
   get ageBadge(): { text: string; label: string } | null {
-    const days = taskAgeInDays(this.task.created);
+    const completed = this.task.status === '✅';
+    if (completed && !this.completedOn) {
+      return null;
+    }
+    const referenceDate = completed ? new Date(`${this.completedOn}T12:00:00`) : new Date();
+    if (!Number.isFinite(referenceDate.getTime())) {
+      return null;
+    }
+    const days = taskAgeInDays(this.task.created, referenceDate);
     if (days === null) {
       return null;
     }
 
     if (days === 0) {
+      if (completed) {
+        return { text: '0', label: 'Completed the same day' };
+      }
       return { text: 'today', label: 'today' };
     }
 
     return {
       text: String(days),
-      label: `${days} ${days === 1 ? 'day' : 'days'}`,
+      label: `${completed ? 'Completed in ' : ''}${days} ${days === 1 ? 'day' : 'days'}`,
     };
   }
 

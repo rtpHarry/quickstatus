@@ -4,6 +4,7 @@
       <ion-reorder slot="start"></ion-reorder>
       <app-task-item
         [task]="task"
+        [completedOn]="completionDates?.[task.id ?? -1]"
         (taskChange)="onTaskChange($event, i)"
         (enterKey)="handleEnterKey(i)"
         (deleteKey)="handleDeleteKey(i)"

@@ -91,6 +91,7 @@ export class TaskListComponent implements OnDestroy {
     this.focusPendingInput();
   }
   @Input() projectId = '';
+  @Input() completionDates: Readonly<Record<number, string>> | null = null;
   @Output() listChange = new EventEmitter<string>();
   @Output() deleteTaskRequest = new EventEmitter<TaskDeleteEvent>();
 

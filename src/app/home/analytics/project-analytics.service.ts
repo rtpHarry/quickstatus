@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   BehaviorSubject, catchError, defer, distinctUntilChanged, EMPTY, filter, finalize,
-  fromEvent, interval, map, merge, of, skip, startWith, Subject, switchMap, tap,
+  fromEvent, interval, map, merge, skip, startWith, Subject, switchMap, tap,
 } from 'rxjs';
 import { ProjectStorageService } from '../data/project-storage.service';
 import { localActivityDate, ProjectDailySummary } from './task-activity.types';
@@ -13,6 +13,8 @@ import { localActivityDate, ProjectDailySummary } from './task-activity.types';
 export class ProjectAnalyticsService {
   private readonly todaySubject = new BehaviorSubject<ProjectDailySummary | undefined>(undefined);
   readonly today$ = this.todaySubject.asObservable();
+  private readonly completionDatesSubject = new BehaviorSubject<Readonly<Record<number, string>>>({});
+  readonly completionDates$ = this.completionDatesSubject.asObservable();
   private readonly errorSubject = new BehaviorSubject<unknown>(null);
   readonly error$ = this.errorSubject.asObservable();
   private readonly refreshRequests = new Subject<() => void>();
@@ -39,17 +41,31 @@ export class ProjectAnalyticsService {
     ).pipe(map(() => undefined));
 
     merge(this.refreshRequests, automaticRefresh$).pipe(
-      switchMap(done => defer(() => this.projectId
-        ? this.storage.getDailySummary(this.projectId, localActivityDate())
-        : of(undefined)
-      ).pipe(
-        tap(summary => {
+      switchMap(done => defer(async () => {
+        if (!this.projectId) {
+          return { summary: undefined, projection: undefined };
+        }
+        const [summary, projection] = await Promise.all([
+          this.storage.getDailySummary(this.projectId, localActivityDate()),
+          this.storage.getTaskProjection(this.projectId),
+        ]);
+        return { summary, projection };
+      }).pipe(
+        tap(({ summary, projection }) => {
+          const dates: Record<number, string> = {};
+          for (const [id, task] of Object.entries(projection?.tasks ?? {})) {
+            if (!task.deleted && task.completedOn) {
+              dates[Number(id)] = task.completedOn;
+            }
+          }
           this.errorSubject.next(null);
           this.todaySubject.next(summary);
+          this.completionDatesSubject.next(dates);
         }),
         // A failed read must not terminate future refreshes.
         catchError(error => {
           this.errorSubject.next(error);
+          this.completionDatesSubject.next({});
           return EMPTY;
         }),
         // Superseded reads also settle callers awaiting refresh/navigation.
@@ -62,6 +78,7 @@ export class ProjectAnalyticsService {
   selectProject(projectId: string): Promise<void> {
     this.projectId = projectId;
     this.todaySubject.next(undefined);
+    this.completionDatesSubject.next({});
     this.errorSubject.next(null);
     return this.refresh();
   }

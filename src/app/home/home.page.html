@@ -50,6 +50,7 @@
       #taskList
       [tasksString]="currentTasksString"
       [projectId]="selectedProjectId"
+      [completionDates]="analytics.completionDates$ | async"
       (listChange)="handleTaskListChange($event)"
       (deleteTaskRequest)="handleTaskDeleteRequest($event)"
     ></app-task-list>
