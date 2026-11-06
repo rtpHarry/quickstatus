@@ -53,6 +53,10 @@ export class TaskItemComponent implements OnInit, OnDestroy {
   private ageRefreshTimer?: ReturnType<typeof setInterval>;
 
   get ageBadge(): { text: string; label: string } | null {
+    if (this.task.sectionHeading === true) {
+      return null;
+    }
+
     const completed = this.task.status === '✅';
     if (completed && !this.completedOn) {
       return null;
