@@ -51,7 +51,7 @@ export class TaskTextEditorComponent implements AfterViewInit {
     editTags: false,
     backspace: true,
     placeholder: 'Enter task',
-    dropdown: { enabled: 0, position: 'text', highlightFirst: true, sortby: 'startsWith' },
+    dropdown: { enabled: 0, position: 'text', highlightFirst: true, sortby: 'startsWith', includeSelectedTags: true },
     templates: {
       dropdownItem: (item) => this.renderSuggestion(item.value),
     },
@@ -62,6 +62,14 @@ export class TaskTextEditorComponent implements AfterViewInit {
       },
     },
     hooks: {
+      suggestionClick: (_event, { tagify, tagData }) => {
+        const value = tagData && normalizeTaskTag(tagData.value);
+        if (value && tagify.value.some((tag) => normalizeTaskTag(tag.value) === value)) {
+          this.dismissExistingTag(tagify);
+          return Promise.reject();
+        }
+        return Promise.resolve();
+      },
       beforeKeyDown: (event, { tagify }) => this.handleKeydown(event, tagify),
       beforePaste: (_event, { pastedText }) => Promise.resolve(pastedText.replace(/[\r\n]+/g, ' ')),
     },
@@ -166,6 +174,21 @@ export class TaskTextEditorComponent implements AfterViewInit {
       option.dataset['newTag'] = 'true';
     }
     return option.outerHTML;
+  }
+
+  private dismissExistingTag(editor: Tagify): void {
+    // Tagify's mixed-mode replacement helper is missing from its published typings.
+    const mixedEditor = editor as Tagify & {
+      replaceTextWithNode(node: Node): void;
+    };
+    const replacement = document.createTextNode('');
+    mixedEditor.replaceTextWithNode(replacement);
+    editor.dropdown.hide(true);
+    editor.DOM.input.focus();
+    const selection = window.getSelection();
+    selection?.collapse(replacement, 0);
+    // Let Tagify refresh its mixed-mode state and report the cleared pending text.
+    editor.DOM.input.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
   private highlightExistingSuggestion(): void {

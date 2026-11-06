@@ -3,6 +3,7 @@ import { TagifyService } from 'ngx-tagify';
 import { TaskTextEditorComponent } from './task-text-editor.component';
 import { BehaviorSubject } from 'rxjs';
 import { ProjectStorageService } from '../../data/project-storage.service';
+import { fromTagifyText } from './task-tag-text';
 
 describe('Task text tag editor', () => {
   let fixture: ComponentFixture<TaskTextEditorComponent>;
@@ -153,6 +154,45 @@ describe('Task text tag editor', () => {
     expect(editor().value.map((tag) => tag.value)).toEqual(['NEW']);
     expect(fixture.nativeElement.querySelector('[role="alert"]').textContent).toContain('could not save');
   }));
+
+  for (const pending of ['@', '@so']) {
+    for (const method of ['keyboard', 'mouse']) {
+      it(`dismisses an existing tag selected by ${method} after typing ${pending}`, fakeAsync(() => {
+        suggestions.next(['SO', 'RTP']);
+        fixture.componentRef.setInput('text', '@SO Work ');
+        fixture.detectChanges();
+        tick(100);
+        const tagify = editor();
+        const input = tagify.DOM.input;
+        input.focus();
+        const selection = window.getSelection()!;
+        selection.selectAllChildren(input);
+        selection.collapseToEnd();
+        document.execCommand('insertText', false, pending);
+        tick(200);
+
+        const option = tagify.DOM.dropdown.querySelector<HTMLElement>('[value="SO"]')!;
+        expect(option).not.toBeNull();
+        if (pending === '@') {
+          expect(tagify.DOM.dropdown.textContent).toContain('RTP');
+        }
+        if (method === 'keyboard') {
+          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        } else {
+          option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        }
+        tick(300);
+
+        expect(tagify.value.map((tag) => tag.value)).toEqual(['SO']);
+        expect(document.body.contains(tagify.DOM.dropdown)).toBeFalse();
+        expect(fromTagifyText(fixture.componentInstance.editorValue)).toBe('@SO Work ');
+        expect(addSuggestions).not.toHaveBeenCalled();
+        document.execCommand('insertText', false, 'next');
+        tick(200);
+        expect(input.textContent).toContain('Work next');
+      }));
+    }
+  }
 
   it('refreshes dynamic suggestions and renders removed tags as plain text without changing the task', fakeAsync(() => {
     suggestions.next(['Client', 'personal']);
