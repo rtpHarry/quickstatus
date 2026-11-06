@@ -13,21 +13,24 @@
             [attr.aria-pressed]="task.status === '✅'"
             [disabled]="task.sectionHeading === true"
             (click)="selectStatus('✅')"
-            aria-label="Status: green check"
+            title="Complete"
+            aria-label="Complete"
           >✅</button>
           <button
             type="button"
             [attr.aria-pressed]="task.status === '☑️'"
             [disabled]="task.sectionHeading === true"
             (click)="selectStatus('☑️')"
-            aria-label="Status: checked box"
+            title="In-Progress"
+            aria-label="In-Progress"
           >☑️</button>
           <button
             type="button"
             [attr.aria-pressed]="task.status === '❌'"
             [disabled]="task.sectionHeading === true"
             (click)="selectStatus('❌')"
-            aria-label="Status: cross"
+            title="Incomplete"
+            aria-label="Incomplete"
           >❌</button>
         </div>
       </ion-col>
