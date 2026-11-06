@@ -238,16 +238,17 @@ describe('Task text tag editor', () => {
     expect(changed).not.toHaveBeenCalled();
   }));
 
-  it('loads known @ tags, preserving brackets, emails, repeated tags and literal HTML', fakeAsync(() => {
+  it('deduplicates leading tags on load, preserving brackets, emails, inline tags and literal HTML', fakeAsync(() => {
     const text = '@M @M Task [M] [[RTP]] a@M.com <b> & @RTP';
     fixture.componentRef.setInput('text', text);
     const changed = spyOn(fixture.componentInstance.textChange, 'emit');
     fixture.detectChanges();
     tick(100);
-    expect(editor().getTagElms().length).toBe(2);
+    expect(editor().getTagElms().map((tag) => tag.getAttribute('value'))).toEqual(['M']);
+    expect(editor().DOM.input.textContent).toContain('Task [M] [[RTP]] a@M.com <b> & @RTP');
     expect(editor().DOM.input.querySelector('b')).toBeNull();
     expect(editor().DOM.input.textContent).toContain('<b> &');
-    expect(changed).not.toHaveBeenCalled();
+    expect(changed).toHaveBeenCalledWith('@M Task [M] [[RTP]] a@M.com <b> & @RTP');
   }));
 
   it('keeps an escaped inline mention as text after reload and suggestion refresh', fakeAsync(() => {

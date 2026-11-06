@@ -30,7 +30,14 @@ export function toTagifyText(text: string, suggestions: string[]): string {
   const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   let mixed = '';
   let end = 0;
+  const seen = new Set<string>();
   for (const tag of leadingTaskTags(escaped, suggestions)) {
+    // Remove repeated leading tags before Tagify restores the accepted chips.
+    if (seen.has(tag.value)) {
+      end = tag.end;
+      continue;
+    }
+    seen.add(tag.value);
     mixed += escaped.slice(end, tag.start) + tagDelimiters[0] + JSON.stringify({ value: tag.value, prefix: '@' }) + tagDelimiters[1];
     end = tag.end;
   }

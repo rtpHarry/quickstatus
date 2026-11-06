@@ -42,7 +42,26 @@ describe('Dynamic task tags', () => {
 
   it('matches configured tags regardless of casing and serializes accepted tags in uppercase', () => {
     const mixed = toTagifyText('@client @ClIeNt @Other a@client.com', ['Client']);
-    expect(fromTagifyText(mixed)).toBe('@CLIENT @CLIENT @Other a@client.com');
+    expect(fromTagifyText(mixed)).toBe('@CLIENT @Other a@client.com');
     expect(findTaskTags('@client @CLIENT @ClIeNt')).toEqual(['CLIENT']);
+  });
+
+  for (const text of [
+    '@m @M @rtp @RTP @m Work @M @M',
+    '@m\t@M\u00A0@rtp @RTP @m Work @M @M',
+  ]) {
+    it(`removes repeated leading tags before parsing ${text}`, () => {
+      const mixed = toTagifyText(text, ['M', 'RTP']);
+      expect(fromTagifyText(mixed)).toBe('@M @RTP Work @M @M');
+      expect(mixed.split(tagDelimiters[0]).length - 1).toBe(2);
+      expect(fromTagifyText(toTagifyText(fromTagifyText(mixed), ['M', 'RTP'])))
+        .toBe('@M @RTP Work @M @M');
+    });
+  }
+
+  it('removes duplicates from a tag-only prefix and leaves unknown prefixes untouched', () => {
+    expect(fromTagifyText(toTagifyText('@M @m', ['M']))).toBe('@M');
+    expect(fromTagifyText(toTagifyText('@unknown @M @M Work', ['M'])))
+      .toBe('@unknown @M @M Work');
   });
 });
