@@ -58,7 +58,14 @@ export class TaskTextEditorComponent implements AfterViewInit {
 
   async focus(): Promise<void> {
     await this.editorReady;
-    this.tagifyService.get('task')?.DOM.input.focus();
+    const input = this.tagifyService.get('task')?.DOM.input;
+    if (input) {
+      input.focus();
+      const selection = window.getSelection();
+      selection?.selectAllChildren(input);
+      selection?.collapseToEnd();
+      input.scrollLeft = input.scrollWidth;
+    }
   }
 
   onEditorChange(value: string): void {

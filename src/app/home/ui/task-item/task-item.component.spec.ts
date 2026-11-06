@@ -10,6 +10,20 @@ describe('Task item editor shortcuts', () => {
     expect(focus).toHaveBeenCalledTimes(1);
   });
 
+  it('places the caret at the end when focusing a heading', async () => {
+    const component = new TaskItemComponent({} as never);
+    const input = document.createElement('input');
+    input.value = 'Heading';
+    input.setSelectionRange(0, 0);
+    component.headingInput = {
+      getInputElement: async () => input,
+      setFocus: async () => input.focus(),
+    } as never;
+    await component.focusInput();
+    expect(input.selectionStart).toBe(input.value.length);
+    expect(input.selectionEnd).toBe(input.value.length);
+  });
+
   it('prevents a newline when Enter creates a task', () => {
     const component = new TaskItemComponent({} as never);
     component.task = { text: 'Work', status: '❌' };

@@ -90,8 +90,10 @@ export class TaskItemComponent implements OnInit, OnDestroy {
 
   async focusInput(): Promise<void> {
     if (this.headingInput) {
-      await this.headingInput.getInputElement();
+      const input = await this.headingInput.getInputElement();
       await this.headingInput.setFocus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      input.scrollLeft = input.scrollWidth;
     } else {
       await this.input?.focus();
     }

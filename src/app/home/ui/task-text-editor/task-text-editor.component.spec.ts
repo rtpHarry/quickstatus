@@ -48,6 +48,30 @@ describe('Task text tag editor', () => {
     expect(changed).not.toHaveBeenCalled();
   }));
 
+  it('moves the caret to the end on each programmatic focus', async () => {
+    fixture.componentRef.setInput('text', '@M Work @RTP');
+    fixture.detectChanges();
+    await fixture.componentInstance.focus();
+    expect(editor().getTagElms().length).toBe(2);
+    const input = editor().DOM.input;
+    input.focus();
+    const selection = window.getSelection()!;
+    selection.collapse(input, 0);
+
+    await fixture.componentInstance.focus();
+    const beforeCaret = document.createRange();
+    beforeCaret.selectNodeContents(input);
+    beforeCaret.setEnd(selection.anchorNode!, selection.anchorOffset);
+    expect(beforeCaret.toString()).toBe(input.textContent ?? '');
+    expect(selection.isCollapsed).toBeTrue();
+
+    // Revisiting a row also overrides a selection the browser remembered.
+    selection.collapse(input, 0);
+    await fixture.componentInstance.focus();
+    expect(selection.anchorNode).toBe(input);
+    expect(selection.anchorOffset).toBe(input.childNodes.length);
+  });
+
   it('saves inserted tags as @ text without moving tags or leaking Tagify JSON', fakeAsync(() => {
     fixture.componentRef.setInput('text', 'Work ');
     fixture.detectChanges();
