@@ -39,7 +39,8 @@ export class TaskTextEditorComponent implements AfterViewInit {
 
   readonly settings: TagifySettings = {
     mode: 'mix',
-    pattern: /@/,
+    // Match only the @ itself, at the start or after a space (including editor NBSPs).
+    pattern: /(?<![^ \u00A0])@/,
     mixTagsInterpolator: tagDelimiters,
     whitelist: [],
     enforceWhitelist: false,

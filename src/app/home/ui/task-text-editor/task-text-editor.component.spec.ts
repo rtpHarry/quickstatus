@@ -81,6 +81,33 @@ describe('Task text tag editor', () => {
     expect(changed.calls.mostRecent().args[0]).toBe('@NEW-TAG Work next');
   }));
 
+  for (const text of ['matthew@rtp', 'Contact matthew@rtp', 'word@rtp', '(@rtp']) {
+    it(`does not open tag suggestions inside ${text}`, fakeAsync(() => {
+      fixture.detectChanges();
+      tick(100);
+      typeText(text);
+      tick(200);
+      expect(document.body.contains(editor().DOM.dropdown)).toBeFalse();
+      expect(editor().value).toEqual([]);
+      expect(editor().DOM.input.textContent).toBe(text);
+      expect(addSuggestions).not.toHaveBeenCalled();
+    }));
+  }
+
+  for (const text of ['@rt', 'Work @rt', 'Work\u00A0@rt']) {
+    it(`opens tag suggestions at a valid boundary in ${text}`, fakeAsync(() => {
+      fixture.detectChanges();
+      tick(100);
+      typeText(text);
+      tick(200);
+      expect(document.body.contains(editor().DOM.dropdown)).toBeTrue();
+      expect(editor().DOM.dropdown.textContent).toContain('RTP');
+      editor().DOM.input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      tick(300);
+      expect(editor().value.map((tag) => tag.value)).toEqual(['RTP']);
+    }));
+  }
+
   it('creates the first tag when autocomplete is empty', fakeAsync(() => {
     suggestions.next([]);
     fixture.detectChanges();
