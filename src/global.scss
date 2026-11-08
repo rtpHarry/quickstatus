@@ -63,9 +63,16 @@ app-task-text-editor .tagify__input br {
 }
 
 .tagify__dropdown {
+  --tagify-dd-border-radius: 10px;
   --tagify-dd-bg-color: #fff;
   --tagify-dd-color-primary: var(--ion-color-primary, #0054e9);
   --tagify-dd-text-color: #000;
+  border-radius: var(--tagify-dd-border-radius);
+}
+
+.tagify__dropdown__wrapper,
+.tagify__dropdown__item {
+  border-radius: var(--tagify-dd-border-radius);
 }
 
 app-settings .tagify {
