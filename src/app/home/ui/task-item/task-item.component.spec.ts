@@ -1,5 +1,7 @@
 import { TaskItemComponent } from './task-item.component';
 import { fakeAsync, TestBed, tick, discardPeriodicTasks } from '@angular/core/testing';
+import { of } from 'rxjs';
+import { ProjectStorageService } from '../../data/project-storage.service';
 
 describe('Task age badge', () => {
   beforeEach(() => {
@@ -90,11 +92,22 @@ describe('Task row rendered editor', () => {
     document.body.style.display = originalDisplay;
   });
 
-  function render(sectionHeading = false) {
-    TestBed.configureTestingModule({ imports: [TaskItemComponent] });
+  function createFixture(sectionHeading = false) {
+    TestBed.configureTestingModule({
+      imports: [TaskItemComponent],
+      providers: [{
+        provide: ProjectStorageService,
+        useValue: { autocompleteTags: ['M', 'RTP'], autocompleteTags$: of(['M', 'RTP']) },
+      }],
+    });
     const fixture = TestBed.createComponent(TaskItemComponent);
-    fixture.componentRef.setInput('task', { text: 'Work @M', status: '❌', sectionHeading });
+    fixture.componentRef.setInput('task', { text: '@M Work', status: '❌', sectionHeading });
     fixture.detectChanges();
+    return fixture;
+  }
+
+  function render(sectionHeading = false) {
+    const fixture = createFixture(sectionHeading);
     tick(100);
     return fixture;
   }
@@ -141,6 +154,44 @@ describe('Task row rendered editor', () => {
     fixture.destroy();
     discardPeriodicTasks();
   }));
+
+  it('keeps long task text within the available width beside the row buttons', async () => {
+    const fixture = createFixture();
+    const host = fixture.nativeElement as HTMLElement;
+    host.style.display = 'block';
+    // Wait for Ionic's real hydration before measuring the rendered grid.
+    await Promise.all(Array.from(host.querySelectorAll('*')).map((element) => {
+      const ionicElement = element as HTMLElement & { componentOnReady?: () => Promise<unknown> };
+      return ionicElement.componentOnReady?.();
+    }));
+    const input = host.querySelector<HTMLElement>('.tagify__input')!;
+    const actions = host.querySelector<HTMLElement>('.task-actions')!;
+    const status = host.querySelector<HTMLElement>('.status-buttons')!;
+    const column = host.querySelector<HTMLElement>('.task-text-column')!;
+
+    for (const width of [600, 1000]) {
+      host.style.width = `${width}px`;
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const originalWidth = column.getBoundingClientRect().width;
+      for (const text of ['Long task description '.repeat(100), 'x'.repeat(2000)]) {
+        fixture.componentRef.setInput('task', { text, status: '❌' });
+        fixture.detectChanges();
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        const editorBounds = input.getBoundingClientRect();
+        const actionsBounds = actions.getBoundingClientRect();
+        const statusBounds = status.getBoundingClientRect();
+        expect(editorBounds.width).toBeGreaterThan(0);
+        expect(column.getBoundingClientRect().width).toBeCloseTo(originalWidth, 0);
+        expect(editorBounds.right).toBeLessThanOrEqual(actionsBounds.left);
+        expect(actionsBounds.right).toBeLessThanOrEqual(host.getBoundingClientRect().right);
+        expect(actionsBounds.top).toBeLessThan(statusBounds.bottom);
+        expect(input.scrollWidth).toBeGreaterThan(input.clientWidth);
+        expect(editorBounds.height).toBeLessThanOrEqual(44);
+      }
+    }
+
+    fixture.destroy();
+  });
 
   it('retains keyboard focus when switching to a heading and back', async () => {
     TestBed.configureTestingModule({ imports: [TaskItemComponent] });

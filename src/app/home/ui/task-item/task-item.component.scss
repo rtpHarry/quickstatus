@@ -75,6 +75,11 @@
   align-items: center;
 }
 
+.task-text-column {
+  // Allow the single-line editor to shrink beside the fixed-width controls.
+  min-width: 0;
+}
+
 .task-age-badge {
   padding: 3px 6px;
   margin-right: 4px;
