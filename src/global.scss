@@ -26,6 +26,21 @@
 @import "@ionic/angular/css/text-transformation.css";
 @import "@ionic/angular/css/flex-utils.css";
 
+// Ionic fades the toolbar background while the large title is expanded.
+// Keep a solid red background behind it so the fixed buttons stay readable.
+ion-app.localhost ion-header {
+  background-color: #c5000f;
+}
+
+ion-app.localhost ion-header ion-toolbar {
+  --background: #c5000f;
+  --color: #fff;
+
+  ion-button {
+    --color: #fff;
+  }
+}
+
 /* Tagify creates its editable DOM dynamically, outside Angular's style scoping. */
 app-task-text-editor .tagify {
   --tags-border-color: transparent;
