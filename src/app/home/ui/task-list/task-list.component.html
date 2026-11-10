@@ -10,6 +10,7 @@
         (deleteKey)="handleDeleteKey(i)"
         (upArrow)="handleUpArrow(i)"
         (downArrow)="handleDownArrow(i)"
+        (moveRow)="moveTask(i, $event)"
         style="flex-grow: 1"
       ></app-task-item>
       <ion-button

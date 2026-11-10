@@ -87,6 +87,7 @@ export class TaskItemComponent implements OnInit, OnDestroy {
   @Output() deleteKey = new EventEmitter<void>();
   @Output() upArrow = new EventEmitter<void>();
   @Output() downArrow = new EventEmitter<void>();
+  @Output() moveRow = new EventEmitter<-1 | 1>();
 
   constructor(private changeDetectorRef: ChangeDetectorRef) {
     addIcons({
@@ -157,7 +158,10 @@ export class TaskItemComponent implements OnInit, OnDestroy {
     const isEmpty = !this.task.text || this.task.text.trim() === '';
     const key = event.key.toLowerCase();
 
-    if (event.key === 'Enter') {
+    if (event.metaKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault();
+      this.moveRow.emit(event.key === 'ArrowUp' ? -1 : 1);
+    } else if (event.key === 'Enter') {
       event.preventDefault();
       this.emitEnterKey();
     } else if (isCtrlPressed && key === 'p') {

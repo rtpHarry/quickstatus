@@ -219,6 +219,15 @@ export class TaskTextEditorComponent implements AfterViewInit {
     const editingTag = (event.target as HTMLElement).closest('.tagify__tag');
     // A closed dropdown still has a parent in Tagify's detached HTML document.
     const suggestionsOpen = document.body.contains(tagify.DOM.dropdown);
+    if (!event.isComposing && !editingTag && event.metaKey && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
+      tagify.dropdown.hide(true);
+      this.editorKeydown.emit(event);
+      if (event.defaultPrevented) {
+        event.stopPropagation();
+        return Promise.reject();
+      }
+      return Promise.resolve();
+    }
     if (!event.isComposing && suggestionsOpen && ['ArrowDown', 'ArrowUp'].includes(event.key)) {
       const shortcut = this.newTagShortcut;
       this.newTagShortcut = undefined;

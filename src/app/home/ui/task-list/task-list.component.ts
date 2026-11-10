@@ -173,6 +173,20 @@ export class TaskListComponent implements OnDestroy {
     }
   }
 
+  moveTask(index: number, direction: -1 | 1) {
+    const targetIndex = index + direction;
+    if (index < 0 || index >= this.tasks.length || targetIndex < 0 || targetIndex >= this.tasks.length) {
+      return;
+    }
+
+    const task = this.tasks.splice(index, 1)[0];
+    this.tasks.splice(targetIndex, 0, task);
+    this.emitListChange();
+    // Moving a DOM node can drop focus; render its new position before restoring it.
+    this.changeDetectorRef.detectChanges();
+    void this.taskItems?.get(targetIndex)?.focusInput();
+  }
+
   reorderTasks(event: any) {
     const itemMove = this.tasks.splice(event.detail.from, 1)[0];
     this.tasks.splice(event.detail.to, 0, itemMove);

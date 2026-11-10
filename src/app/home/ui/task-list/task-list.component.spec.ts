@@ -3,15 +3,55 @@ import { ProjectActivityMutation } from '../../analytics/task-activity.types';
 import { parseTasksString, Task } from './task-list.utils';
 import { DefaultIterableDiffer } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { of } from 'rxjs';
 import { ProjectStorageService } from '../../data/project-storage.service';
 
 describe('Rendered new row focus', () => {
+  it('keeps the moved editor focused through repeated Cmd arrows and save feedback', async () => {
+    const display = document.body.style.display;
+    document.body.style.display = 'block';
+    const commit = jasmine.createSpy('commitTaskActivity').and.resolveTo([]);
+    TestBed.configureTestingModule({
+      imports: [TaskListComponent],
+      providers: [{ provide: ProjectStorageService, useValue: { commitTaskActivity: commit, autocompleteTags: [], autocompleteTags$: of([]) } }],
+    });
+    const fixture = TestBed.createComponent(TaskListComponent);
+    try {
+      fixture.componentRef.setInput('projectId', 'test');
+      fixture.componentRef.setInput('tasksString', '❌ First [id:1]\n❌ Second [id:2]\n❌ Third [id:3]');
+      fixture.componentInstance.listChange.subscribe((value) => {
+        fixture.componentRef.setInput('tasksString', value);
+      });
+      fixture.detectChanges();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const input = fixture.nativeElement.querySelectorAll('.tagify__input')[1] as HTMLElement;
+      input.focus();
+      for (const [key, ids] of [
+        ['ArrowUp', [2, 1, 3]],
+        ['ArrowDown', [1, 2, 3]],
+        ['ArrowDown', [1, 3, 2]],
+        ['ArrowDown', [1, 3, 2]],
+      ] as const) {
+        input.dispatchEvent(new KeyboardEvent('keydown', { key, metaKey: true, bubbles: true, cancelable: true }));
+        fixture.detectChanges();
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        expect(fixture.componentInstance.tasks.map((task) => task.id)).toEqual([...ids]);
+        expect(document.activeElement).toBe(input);
+      }
+      expect(commit).toHaveBeenCalledTimes(3);
+    } finally {
+      fixture.destroy();
+      document.body.style.display = display;
+    }
+  });
+
   it('keeps the new editor ready for typing after Enter and save feedback settle', async () => {
     const display = document.body.style.display;
     document.body.style.display = 'block';
     TestBed.configureTestingModule({
       imports: [TaskListComponent],
       providers: [{ provide: ProjectStorageService, useValue: {
+        autocompleteTags: [], autocompleteTags$: of([]),
         allocateTaskIds: async () => [2],
         commitTaskActivity: async () => [],
       } }],
@@ -24,6 +64,7 @@ describe('Rendered new row focus', () => {
         fixture.componentRef.setInput('tasksString', value);
       });
       fixture.detectChanges();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       const first = fixture.nativeElement.querySelector('.tagify__input') as HTMLElement;
       first.focus();
@@ -112,6 +153,35 @@ describe('New task row identities', () => {
     expect(component.tasks.map((task) => task.id)).toEqual([1, 100]);
     expect(calls).toEqual(['render', 'focus']);
     expect(focusInput).toHaveBeenCalledTimes(1);
+    component.ngOnDestroy();
+  });
+
+  it('moves one row at a time, saves identity and restores focus without wrapping', async () => {
+    const { component, mutations, changeDetector } = setup();
+    component.tasksString = '❌ First [id:1]\n❌ Second [id:2]\n❌ Third [id:3]';
+    const focusInput = jasmine.createSpy('focusInput').and.resolveTo();
+    const get = jasmine.createSpy('get').and.returnValue({ focusInput });
+    component.taskItems = { get } as never;
+    const render = spyOn(changeDetector, 'detectChanges');
+    component.listChange.subscribe((value) => {
+      component.tasksString = value;
+    });
+
+    component.moveTask(1, -1);
+    expect(component.tasks.map((task) => task.id)).toEqual([2, 1, 3]);
+    expect(render).toHaveBeenCalled();
+    expect(get).toHaveBeenCalledWith(0);
+    expect(focusInput).toHaveBeenCalledTimes(1);
+    component.moveTask(0, -1);
+    component.moveTask(2, 1);
+    expect(mutations.length).toBe(1);
+    component.moveTask(0, 1);
+    component.moveTask(1, 1);
+    await component.flushPendingChanges();
+    expect(component.tasks.map((task) => task.id)).toEqual([1, 3, 2]);
+    expect(parseTasksString(mutations[2].tasks!).map((task) => task.id)).toEqual([1, 3, 2]);
+    expect(mutations.every((mutation) => mutation.events.length === 0)).toBeTrue();
+    expect(get).toHaveBeenCalledWith(2);
     component.ngOnDestroy();
   });
 

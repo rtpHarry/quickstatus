@@ -133,6 +133,27 @@ describe('Task row rendered editor', () => {
     discardPeriodicTasks();
   }));
 
+  it('routes Cmd arrows to reordering without emitting focus navigation', fakeAsync(() => {
+    const fixture = render();
+    const row = fixture.componentInstance;
+    const move = spyOn(row.moveRow, 'emit');
+    const up = spyOn(row.upArrow, 'emit');
+    const down = spyOn(row.downArrow, 'emit');
+    const input = fixture.nativeElement.querySelector('.tagify__input') as HTMLElement;
+    input.focus();
+    for (const key of ['ArrowUp', 'ArrowDown']) {
+      const event = new KeyboardEvent('keydown', { key, metaKey: true, bubbles: true, cancelable: true });
+      input.dispatchEvent(event);
+      expect(event.defaultPrevented).withContext(key).toBeTrue();
+      tick(100);
+    }
+    expect(move.calls.allArgs()).toEqual([[-1], [1]]);
+    expect(up).not.toHaveBeenCalled();
+    expect(down).not.toHaveBeenCalled();
+    fixture.destroy();
+    discardPeriodicTasks();
+  }));
+
   it('keeps the editor within a single compact line', fakeAsync(() => {
     const fixture = render();
     const editor = fixture.nativeElement.querySelector('app-task-text-editor') as HTMLElement;
