@@ -5,9 +5,11 @@ import {
   Component,
   EventEmitter,
   Input,
+  OnChanges,
   OnDestroy,
   Output,
   QueryList,
+  SimpleChanges,
   ViewChild,
   ViewChildren,
 } from '@angular/core';
@@ -73,7 +75,7 @@ import {
     FormsModule,
   ],
 })
-export class TaskListComponent implements OnDestroy {
+export class TaskListComponent implements OnChanges, OnDestroy {
   private _lastTasksString: string | null = null;
   private pendingFocusIndex: number | null = null;
 
@@ -88,6 +90,7 @@ export class TaskListComponent implements OnDestroy {
     this.saveError = undefined;
     this.clearListChangeTimer();
     this.tasks = parseTasksString(value);
+    this.clearSelection();
     this.focusPendingInput();
   }
   @Input() projectId = '';
@@ -103,6 +106,8 @@ export class TaskListComponent implements OnDestroy {
   private listVersion = 0;
   private pendingSave: Promise<void> = Promise.resolve();
   private saveError: unknown;
+  private selectionAnchor: number | null = null;
+  private selectionEnd: number | null = null;
 
   @ViewChild(IonModal) modal!: IonModal;
   @ViewChild('pasteTextarea') pasteTextarea!: IonTextarea;
@@ -125,12 +130,48 @@ export class TaskListComponent implements OnDestroy {
     this.clearListChangeTimer();
   }
 
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['projectId']) {
+      this.clearSelection();
+    }
+  }
+
+  clearSelection() {
+    this.selectionAnchor = null;
+    this.selectionEnd = null;
+  }
+
+  isSelected(index: number): boolean {
+    return this.selectionAnchor !== null && this.selectionEnd !== null
+      && index >= Math.min(this.selectionAnchor, this.selectionEnd)
+      && index <= Math.max(this.selectionAnchor, this.selectionEnd);
+  }
+
+  onRowFocus(index: number) {
+    if (index !== this.selectionEnd) {
+      this.clearSelection();
+    }
+  }
+
+  extendSelection(index: number, direction: -1 | 1) {
+    if (!this.tasks[index]) {
+      return;
+    }
+    if (this.selectionEnd !== index || this.selectionAnchor === null) {
+      this.selectionAnchor = index;
+    }
+    this.selectionEnd = Math.max(0, Math.min(this.tasks.length - 1, index + direction));
+    this.changeDetectorRef.detectChanges();
+    void this.taskItems?.get(this.selectionEnd)?.focusInput();
+  }
+
   trackTask(index: number, task: Task): number {
     return task.id ?? index;
   }
 
   async addTask(index?: number) {
     await this.queueRowCreation(([id]) => {
+      this.clearSelection();
       const insertIndex = index !== undefined ? index + 1 : this.tasks.length;
       this.tasks.splice(insertIndex, 0, createEmptyTask(id));
       // The ID reservation completes asynchronously. Render the inserted row
@@ -152,6 +193,7 @@ export class TaskListComponent implements OnDestroy {
   }
 
   handleUpArrow(index: number) {
+    this.clearSelection();
     if (index > 0) {
       setTimeout(() => {
         const previousRow = this.taskItems?.get(index - 1);
@@ -163,6 +205,7 @@ export class TaskListComponent implements OnDestroy {
   }
 
   handleDownArrow(index: number) {
+    this.clearSelection();
     if (index < this.tasks.length - 1) {
       setTimeout(() => {
         const nextRow = this.taskItems?.get(index + 1);
@@ -174,22 +217,37 @@ export class TaskListComponent implements OnDestroy {
   }
 
   moveTask(index: number, direction: -1 | 1) {
-    const targetIndex = index + direction;
-    if (index < 0 || index >= this.tasks.length || targetIndex < 0 || targetIndex >= this.tasks.length) {
+    if (!this.tasks[index]) {
       return;
     }
-
-    const task = this.tasks.splice(index, 1)[0];
-    this.tasks.splice(targetIndex, 0, task);
+    const selected = this.isSelected(index);
+    const anchor = this.selectionAnchor ?? index;
+    const selectionEnd = this.selectionEnd ?? index;
+    const start = selected ? Math.min(anchor, selectionEnd) : index;
+    const end = selected ? Math.max(anchor, selectionEnd) : index;
+    const targetIndex = start + direction;
+    if (targetIndex < 0 || end + direction >= this.tasks.length) {
+      return;
+    }
+    const movedTasks = this.tasks.splice(start, end - start + 1);
+    this.tasks.splice(targetIndex, 0, ...movedTasks);
+    if (selected) {
+      this.selectionAnchor = anchor + direction;
+      this.selectionEnd = selectionEnd + direction;
+    } else {
+      this.clearSelection();
+    }
     this.emitListChange();
     // Moving a DOM node can drop focus; render its new position before restoring it.
     this.changeDetectorRef.detectChanges();
-    const movedRow = this.taskItems?.get(targetIndex);
-    movedRow?.flashMove();
-    void movedRow?.focusInput();
+    for (let row = targetIndex; row < targetIndex + movedTasks.length; row++) {
+      this.taskItems?.get(row)?.flashMove();
+    }
+    void this.taskItems?.get(index + direction)?.focusInput();
   }
 
   reorderTasks(event: any) {
+    this.clearSelection();
     const itemMove = this.tasks.splice(event.detail.from, 1)[0];
     this.tasks.splice(event.detail.to, 0, itemMove);
     event.detail.complete();
@@ -204,6 +262,7 @@ export class TaskListComponent implements OnDestroy {
   }
 
   requestDeleteTask(index: number) {
+    this.clearSelection();
     const task = this.tasks[index];
     if (!task) {
       return;
@@ -298,6 +357,7 @@ export class TaskListComponent implements OnDestroy {
   async confirmPaste() {
     const tasks = parseTasksString(this.pastedContent);
     const applied = await this.queueRowCreation((ids) => {
+      this.clearSelection();
       this.tasks = tasks.map((task, index) => ({ ...task, id: ids[index] }));
     }, tasks.length, 'paste');
     if (applied) {

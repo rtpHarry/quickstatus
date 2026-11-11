@@ -47,6 +47,7 @@ import { lockClosedOutline, lockOpenOutline, textOutline } from 'ionicons/icons'
 })
 export class TaskItemComponent implements OnInit, OnDestroy {
   @Input() task!: Task;
+  @Input() selected = false;
   @Input() completedOn?: string;
   @Output() taskChange = new EventEmitter<Task>();
   @ViewChild(TaskTextEditorComponent) input?: TaskTextEditorComponent;
@@ -91,6 +92,8 @@ export class TaskItemComponent implements OnInit, OnDestroy {
   @Output() upArrow = new EventEmitter<void>();
   @Output() downArrow = new EventEmitter<void>();
   @Output() moveRow = new EventEmitter<-1 | 1>();
+  @Output() selectRow = new EventEmitter<-1 | 1>();
+  @Output() clearSelectionKey = new EventEmitter<void>();
 
   constructor(private changeDetectorRef: ChangeDetectorRef) {
     addIcons({
@@ -173,6 +176,11 @@ export class TaskItemComponent implements OnInit, OnDestroy {
     if (event.metaKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
       event.preventDefault();
       this.moveRow.emit(event.key === 'ArrowUp' ? -1 : 1);
+    } else if (event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault();
+      this.selectRow.emit(event.key === 'ArrowUp' ? -1 : 1);
+    } else if (event.key === 'Escape') {
+      this.clearSelectionKey.emit();
     } else if (event.key === 'Enter') {
       event.preventDefault();
       this.emitEnterKey();

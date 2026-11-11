@@ -7,6 +7,59 @@ import { of } from 'rxjs';
 import { ProjectStorageService } from '../../data/project-storage.service';
 
 describe('Rendered new row focus', () => {
+  it('selects normal and private rows with Shift arrows and moves them together', async () => {
+    const display = document.body.style.display;
+    document.body.style.display = 'block';
+    const commit = jasmine.createSpy('commitTaskActivity').and.resolveTo([]);
+    TestBed.configureTestingModule({
+      imports: [TaskListComponent],
+      providers: [{ provide: ProjectStorageService, useValue: {
+        commitTaskActivity: commit, autocompleteTags: [], autocompleteTags$: of([]),
+      } }],
+    });
+    const fixture = TestBed.createComponent(TaskListComponent);
+    try {
+      fixture.componentRef.setInput('projectId', 'test');
+      fixture.componentRef.setInput('tasksString', '❌ First [id:1]\n❌ Second [id:2]\n❌ Third [id:3]\n❌ Last [id:4]');
+      fixture.componentInstance.listChange.subscribe((value) => {
+        fixture.componentRef.setInput('tasksString', value);
+      });
+      fixture.componentInstance.tasks[2].private = true;
+      fixture.detectChanges();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const inputs = fixture.nativeElement.querySelectorAll('.tagify__input') as NodeListOf<HTMLElement>;
+      inputs[1].focus();
+      inputs[1].dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'ArrowDown', shiftKey: true, bubbles: true, cancelable: true,
+      }));
+      fixture.detectChanges();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      expect(document.activeElement).toBe(inputs[2]);
+      expect(fixture.nativeElement.querySelectorAll('.selected-row').length).toBe(2);
+      expect(fixture.nativeElement.querySelectorAll('.private-row.selected-row').length).toBe(1);
+      expect(commit).not.toHaveBeenCalled();
+
+      inputs[2].dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'ArrowUp', metaKey: true, bubbles: true, cancelable: true,
+      }));
+      fixture.detectChanges();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      expect(fixture.componentInstance.tasks.map((task) => task.id)).toEqual([2, 3, 1, 4]);
+      expect(document.activeElement).toBe(inputs[2]);
+      expect(fixture.nativeElement.querySelectorAll('.selected-row').length).toBe(2);
+      expect(commit).toHaveBeenCalledTimes(1);
+
+      inputs[2].dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Escape', bubbles: true, cancelable: true,
+      }));
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.selected-row')).toBeNull();
+    } finally {
+      fixture.destroy();
+      document.body.style.display = display;
+    }
+  });
+
   it('keeps the moved editor focused through repeated Cmd arrows and save feedback', async () => {
     const display = document.body.style.display;
     document.body.style.display = 'block';
@@ -110,6 +163,58 @@ describe('New task row identities', () => {
     component.tasksString = '❌ Existing [id:1]';
     return { component, storage, mutations, changeDetector };
   }
+
+  it('extends, shrinks and reverses a contiguous selection without saving', () => {
+    const { component, mutations } = setup();
+    component.tasksString = '❌ First [id:1]\n❌ Second [id:2]\n❌ Third [id:3]\n❌ Fourth [id:4]';
+    const selectedIds = () => component.tasks.filter((_, index) => component.isSelected(index)).map((task) => task.id);
+    component.extendSelection(1, 1);
+    expect(selectedIds()).toEqual([2, 3]);
+    component.extendSelection(2, -1);
+    expect(selectedIds()).toEqual([2]);
+    component.extendSelection(1, -1);
+    expect(selectedIds()).toEqual([1, 2]);
+    component.extendSelection(0, -1);
+    expect(selectedIds()).toEqual([1, 2]);
+    expect(mutations).toEqual([]);
+    component.onRowFocus(3);
+    expect(selectedIds()).toEqual([]);
+    component.ngOnDestroy();
+  });
+
+  it('moves a selection by its first row, preserves order and stops at list boundaries', async () => {
+    const { component, mutations } = setup();
+    component.tasksString = '❌ First [id:1]\n❌ Second [id:2]\n❌ Third [id:3]\n❌ Fourth [id:4]';
+    component.extendSelection(2, -1);
+    component.moveTask(1, -1);
+    expect(component.tasks.map((task) => task.id)).toEqual([2, 3, 1, 4]);
+    expect([0, 1, 2, 3].filter((index) => component.isSelected(index))).toEqual([0, 1]);
+    component.moveTask(0, -1);
+    expect(mutations.length).toBe(1);
+    component.moveTask(0, 1);
+    component.moveTask(1, 1);
+    expect(component.tasks.map((task) => task.id)).toEqual([1, 4, 2, 3]);
+    component.moveTask(2, 1);
+    expect(mutations.length).toBe(3);
+    await component.flushPendingChanges();
+    expect(parseTasksString(mutations[2].tasks!).map((task) => task.id)).toEqual([1, 4, 2, 3]);
+    expect(mutations.every((mutation) => mutation.events.length === 0)).toBeTrue();
+    component.handleUpArrow(2);
+    expect(component.isSelected(2)).toBeFalse();
+    component.ngOnDestroy();
+  });
+
+  it('clears selection when replacing the list or changing projects', () => {
+    const { component } = setup();
+    component.tasksString = '❌ First [id:1]\n❌ Second [id:2]';
+    component.extendSelection(0, 1);
+    component.tasksString = '❌ Replacement [id:3]';
+    expect(component.isSelected(0)).toBeFalse();
+    component.extendSelection(0, 1);
+    component.ngOnChanges({ projectId: {} as never });
+    expect(component.isSelected(0)).toBeFalse();
+    component.ngOnDestroy();
+  });
 
   it('[focus] retains the input row through immutable typing and save feedback', async () => {
     const { component } = setup();

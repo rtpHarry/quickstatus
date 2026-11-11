@@ -56,6 +56,14 @@
   --inner-border-width: 0;
 }
 
+.task-row.selected-row {
+  --background: var(--app-selected-row-background);
+}
+
+.task-row.private-row.selected-row {
+  --background: var(--app-selected-private-row-background);
+}
+
 .section-heading-input {
   font-size: 18px;
   font-weight: 700;

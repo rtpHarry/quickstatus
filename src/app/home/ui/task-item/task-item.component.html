@@ -2,6 +2,7 @@
   lines="none"
   class="task-row"
   [class.private-row]="task.private === true"
+  [class.selected-row]="selected"
   [class.section-heading-row]="task.sectionHeading === true"
 >
   <span #moveHighlight class="move-highlight" aria-hidden="true"></span>
