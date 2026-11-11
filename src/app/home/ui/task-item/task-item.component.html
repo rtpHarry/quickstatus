@@ -4,6 +4,7 @@
   [class.private-row]="task.private === true"
   [class.section-heading-row]="task.sectionHeading === true"
 >
+  <span #moveHighlight class="move-highlight" aria-hidden="true"></span>
   <ion-grid>
     <ion-row class="ion-align-items-center">
       <ion-col size="auto">

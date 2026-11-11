@@ -184,7 +184,9 @@ export class TaskListComponent implements OnDestroy {
     this.emitListChange();
     // Moving a DOM node can drop focus; render its new position before restoring it.
     this.changeDetectorRef.detectChanges();
-    void this.taskItems?.get(targetIndex)?.focusInput();
+    const movedRow = this.taskItems?.get(targetIndex);
+    movedRow?.flashMove();
+    void movedRow?.focusInput();
   }
 
   reorderTasks(event: any) {

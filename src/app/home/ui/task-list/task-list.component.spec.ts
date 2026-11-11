@@ -160,7 +160,8 @@ describe('New task row identities', () => {
     const { component, mutations, changeDetector } = setup();
     component.tasksString = '❌ First [id:1]\n❌ Second [id:2]\n❌ Third [id:3]';
     const focusInput = jasmine.createSpy('focusInput').and.resolveTo();
-    const get = jasmine.createSpy('get').and.returnValue({ focusInput });
+    const flashMove = jasmine.createSpy('flashMove');
+    const get = jasmine.createSpy('get').and.returnValue({ focusInput, flashMove });
     component.taskItems = { get } as never;
     const render = spyOn(changeDetector, 'detectChanges');
     component.listChange.subscribe((value) => {
@@ -175,6 +176,7 @@ describe('New task row identities', () => {
     component.moveTask(0, -1);
     component.moveTask(2, 1);
     expect(mutations.length).toBe(1);
+    expect(flashMove).toHaveBeenCalledTimes(1);
     component.moveTask(0, 1);
     component.moveTask(1, 1);
     await component.flushPendingChanges();

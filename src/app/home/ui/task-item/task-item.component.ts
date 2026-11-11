@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
+  ElementRef,
   EventEmitter,
   Input,
   OnDestroy,
@@ -50,6 +51,8 @@ export class TaskItemComponent implements OnInit, OnDestroy {
   @Output() taskChange = new EventEmitter<Task>();
   @ViewChild(TaskTextEditorComponent) input?: TaskTextEditorComponent;
   @ViewChild(IonInput) headingInput?: IonInput;
+  @ViewChild('moveHighlight') moveHighlight?: ElementRef<HTMLElement>;
+  private moveAnimation?: Animation;
   private ageRefreshTimer?: ReturnType<typeof setInterval>;
 
   get ageBadge(): { text: string; label: string } | null {
@@ -103,6 +106,15 @@ export class TaskItemComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearInterval(this.ageRefreshTimer);
+    this.moveAnimation?.cancel();
+  }
+
+  flashMove(): void {
+    this.moveAnimation?.cancel();
+    this.moveAnimation = this.moveHighlight?.nativeElement.animate(
+      [{ opacity: 0.16 }, { opacity: 0 }],
+      { duration: 800, easing: 'ease-out' }
+    );
   }
 
   async focusInput(): Promise<void> {
